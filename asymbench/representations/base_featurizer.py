@@ -8,9 +8,21 @@ import numpy as np
 import pandas as pd
 from rdkit import Chem
 
+@dataclass
+class BaseRepresentation(abc.ABC):
+    config: Dict[str, Any]
+
+    @abc.abstractmethod
+    def transform(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Return feature matrix aligned to df.index."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_metadata(self) -> Dict[str, Any]:
+        raise NotImplementedError
 
 @dataclass
-class BaseSmilesFeaturizer(abc.ABC):
+class BaseSmilesFeaturizer(BaseRepresentation, abc.ABC):
     """
     Base class for SMILES featurizers that handle:
       - multiple SMILES columns
