@@ -52,4 +52,6 @@ class MoleculeSplitter:
             random_state=self.random_state,
             return_indices=return_indices,
         )
-        return idxs
+        train_idxs, test_idxs = idxs[-2], idxs[-1]
+
+        return train_idxs, test_idxs
