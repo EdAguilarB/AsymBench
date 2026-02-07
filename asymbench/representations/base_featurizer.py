@@ -10,6 +10,59 @@ from rdkit import Chem
 
 
 @dataclass
+class BaseCorpusSmilesFeaturizer(abc.ABC):
+    """
+    Base for featurizers that require seeing a whole column/corpus
+    to define the feature space (e.g., CIRCuS).
+
+    Contract:
+      - fit(df) learns feature space (optional but recommended)
+      - transform(df) returns pd.DataFrame aligned to df.index
+      - fit_transform(df) convenience
+      - get_metadata() for caching/signatures
+    """
+
+    config: Dict[str, Any]
+    sanitize: bool = True
+
+    def __post_init__(self) -> None:
+        rep_cfg = self.config.get("representation", {})
+        data_cfg = self.config.get("data", {})
+
+        self.rep_type: str = rep_cfg.get("type", self.__class__.__name__)
+        self.rep_params: Dict[str, Any] = dict(rep_cfg.get("params", {}))
+
+        self.smiles_cols: List[str] = list(data_cfg.get("smiles_columns", []))
+        if not self.smiles_cols:
+            raise KeyError("config['data']['smiles_columns'] must be provided and non-empty")
+
+        self._is_fitted: bool = False
+        self._feature_names: Optional[List[str]] = None
+
+    @abc.abstractmethod
+    def fit(self, df: pd.DataFrame) -> "BaseCorpusSmilesFeaturizer":
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def transform(self, df: pd.DataFrame) -> pd.DataFrame:
+        raise NotImplementedError
+
+    def fit_transform(self, df: pd.DataFrame) -> pd.DataFrame:
+        return self.fit(df).transform(df)
+
+    def feature_names_total(self) -> Optional[List[str]]:
+        return self._feature_names
+
+    def get_metadata(self) -> Dict[str, Any]:
+        return {
+            "type": self.rep_type,
+            "params": self.rep_params,
+            "smiles_columns": self.smiles_cols,
+            "fitted": self._is_fitted,
+            "n_features": None if self._feature_names is None else len(self._feature_names),
+        }
+
+@dataclass
 class BaseRepresentation(abc.ABC):
     config: Dict[str, Any]
 
