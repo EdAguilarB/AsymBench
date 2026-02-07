@@ -9,7 +9,6 @@ from sklearn.model_selection import KFold, cross_val_score
 
 from asymbench.models.base import get_model
 
-
 def rmse(y_true, y_pred) -> float:
     y_true = np.asarray(y_true)
     y_pred = np.asarray(y_pred)
@@ -51,6 +50,7 @@ class OptunaSklearnOptimizer:
     def optimize(
         self, X_train, y_train
     ) -> Tuple[Any, Dict[str, Any], float, Dict[str, Any]]:
+        optuna.logging.set_verbosity(optuna.logging.INFO)
         hpo = self.model_cfg.get("hpo", {}) or {}
         if not hpo.get("enabled", False):
             model = get_model(
@@ -108,7 +108,7 @@ class OptunaSklearnOptimizer:
         study = optuna.create_study(
             direction=self.direction, sampler=optuna.samplers.TPESampler(seed=self.seed)
         )
-        study.optimize(objective, n_trials=n_trials)
+        study.optimize(objective, n_trials=n_trials, show_progress_bar=True)
 
         best_params = dict(study.best_params)
         best_score = float(study.best_value)  # RMSE
