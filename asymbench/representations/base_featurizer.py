@@ -8,9 +8,15 @@ import numpy as np
 import pandas as pd
 from rdkit import Chem
 
+
 @dataclass
 class BaseRepresentation(abc.ABC):
     config: Dict[str, Any]
+
+    def __post_init__(self) -> None:
+        rep_cfg = self.config.get("representation", {})
+        self.rep_type: str = rep_cfg.get("type", self.__class__.__name__)
+        self.rep_params: Dict[str, Any] = dict(rep_cfg.get("params", {}))
 
     @abc.abstractmethod
     def transform(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -20,6 +26,7 @@ class BaseRepresentation(abc.ABC):
     @abc.abstractmethod
     def get_metadata(self) -> Dict[str, Any]:
         raise NotImplementedError
+
 
 @dataclass
 class BaseSmilesFeaturizer(BaseRepresentation, abc.ABC):
@@ -43,17 +50,14 @@ class BaseSmilesFeaturizer(BaseRepresentation, abc.ABC):
     sanitize: bool = True
 
     def __post_init__(self) -> None:
+        super().__post_init__()
         data_cfg = self.config.get("data", {})
-        rep_cfg = self.config.get("representation", {})
 
         self.smiles_cols: List[str] = list(data_cfg.get("smiles_columns", []))
         if not self.smiles_cols:
             raise KeyError(
                 "config['data']['smiles_columns'] must be provided and non-empty"
             )
-
-        self.rep_type: str = rep_cfg.get("type", self.__class__.__name__)
-        self.rep_params: Dict[str, Any] = dict(rep_cfg.get("params", {}))
 
         # Cache: raw SMILES -> np.ndarray (per-molecule feature vector)
         self._cache: Dict[str, np.ndarray] = {} if self.use_cache else {}
