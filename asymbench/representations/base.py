@@ -1,3 +1,4 @@
+from asymbench.representations.circus import CircusFeaturizer
 from asymbench.representations.df_lookup import DataFrameLookupRepresentation
 from asymbench.representations.mol_descriptors import RDKitDescriptorFeaturizer
 from asymbench.representations.morgan_fp import MorganFeaturizer
@@ -11,6 +12,9 @@ def get_representation(config):
 
     if rep_type == "rdkit":
         return RDKitDescriptorFeaturizer(config)
+
+    if rep_type == "circus":
+        return CircusFeaturizer(config)
 
     if rep_type in ("df_lookup", "bespoke", "precomputed"):
         return DataFrameLookupRepresentation(config)
