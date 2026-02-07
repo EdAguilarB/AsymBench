@@ -66,14 +66,19 @@ class Experiment:
             y = self.dataset.loc[:, self.target]
 
             # 3) Create representation
-            X = self.representation.transform(self.dataset)
+            #X = self.representation.transform(self.dataset)
 
-            # 4) split the data
+            # 3) split the data
             train_idxs, test_idxs = self.split_strategy.get_splits(
                 mols=split_by_mols, y=y
             )
-            X_train, y_train = X.iloc[train_idxs], y.iloc[train_idxs]
-            X_test, y_test = X.iloc[test_idxs], y.iloc[test_idxs]
+            df_train = self.dataset.iloc[train_idxs]
+            df_test = self.dataset.iloc[test_idxs]
+
+            # 4) Create representation
+            X_train, X_test = self._fit_transform_representation(df_train, df_test)
+            y_train = y.iloc[train_idxs]
+            y_test = y.iloc[test_idxs]
 
             # 5) preprocess the data
             X_train = self.preprocessing.fit_transform(X_train)
@@ -142,6 +147,14 @@ class Experiment:
             # Save failure info for post-mortem
             self.run_store.mark_failed(signature, e)
             raise
+
+    def _fit_transform_representation(self, df_train, df_test):
+        rep = self.representation
+        if hasattr(rep, "fit"):
+            rep.fit(df_train)
+        X_train = rep.transform(df_train)
+        X_test  = rep.transform(df_test)
+        return X_train, X_test
 
     def _run_signature(self, model_type: str) -> dict:
         rep_type = getattr(
