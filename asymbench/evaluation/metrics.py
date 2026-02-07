@@ -1,5 +1,5 @@
 import numpy as np
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 
 def evaluate_predictions(y_true, y_pred):
