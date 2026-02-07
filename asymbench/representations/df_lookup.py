@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict
 
 import pandas as pd
 
@@ -37,10 +37,9 @@ class DataFrameLookupRepresentation(BaseRepresentation):
     """
 
     def __post_init__(self) -> None:
-        rep_cfg = self.config.get("representation", {})
-        self.rep_type = rep_cfg.get("type", "df_lookup")
-        params = rep_cfg.get("params", {})
+        super().__post_init__()
 
+        params = self.rep_params
         self.features_path = Path(params["features_path"])
         self.index_col = params.get("index_col", None)
         self.feature_columns = params.get("feature_columns", None)
@@ -52,9 +51,13 @@ class DataFrameLookupRepresentation(BaseRepresentation):
 
         # keep only requested columns
         if self.feature_columns is not None:
-            missing = [c for c in self.feature_columns if c not in self._features.columns]
+            missing = [
+                c for c in self.feature_columns if c not in self._features.columns
+            ]
             if missing:
-                raise KeyError(f"Requested feature_columns not found in features table: {missing[:5]}")
+                raise KeyError(
+                    f"Requested feature_columns not found in features table: {missing[:5]}"
+                )
             self._features = self._features.loc[:, self.feature_columns]
 
         # prefix column names to avoid collisions with other reps / metadata
@@ -73,12 +76,16 @@ class DataFrameLookupRepresentation(BaseRepresentation):
 
         if self.index_col is not None:
             if self.index_col not in feats.columns:
-                raise KeyError(f"index_col='{self.index_col}' not present in features file columns.")
+                raise KeyError(
+                    f"index_col='{self.index_col}' not present in features file columns."
+                )
             feats = feats.set_index(self.index_col)
 
         # Ensure index is unique for lookup
         if not feats.index.is_unique:
-            raise ValueError("Features table index is not unique; cannot do deterministic lookup.")
+            raise ValueError(
+                "Features table index is not unique; cannot do deterministic lookup."
+            )
 
         return feats
 
@@ -99,7 +106,11 @@ class DataFrameLookupRepresentation(BaseRepresentation):
         missing_mask = X.isna().all(axis=1)
         if missing_mask.any():
             n_missing = int(missing_mask.sum())
-            example = keys[missing_mask].iloc[0] if hasattr(keys, "iloc") else list(keys[missing_mask])[0]
+            example = (
+                keys[missing_mask].iloc[0]
+                if hasattr(keys, "iloc")
+                else list(keys[missing_mask])[0]
+            )
             msg = (
                 f"{n_missing} rows missing in features lookup table. "
                 f"Example missing key: {example}"
