@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple, Callable
+from typing import Any, Dict, Tuple
 
 import numpy as np
 import optuna
@@ -14,6 +14,25 @@ def rmse(y_true, y_pred) -> float:
     y_true = np.asarray(y_true)
     y_pred = np.asarray(y_pred)
     return float(np.sqrt(np.mean((y_true - y_pred) ** 2)))
+
+
+def _to_float(x):
+    if isinstance(x, (int, float)):
+        return float(x)
+    if isinstance(x, str):
+        # handles "1e-6", "0.01", etc.
+        return float(x.strip())
+    raise TypeError(f"Expected numeric, got {type(x)}: {x}")
+
+
+def _to_int(x):
+    if isinstance(x, int):
+        return x
+    if isinstance(x, float) and x.is_integer():
+        return int(x)
+    if isinstance(x, str):
+        return int(float(x.strip()))
+    raise TypeError(f"Expected int-like, got {type(x)}: {x}")
 
 
 @dataclass
@@ -45,22 +64,24 @@ class OptunaSklearnOptimizer:
 
         def suggest(trial: optuna.Trial, spec: Dict[str, Any]):
             t = spec["type"]
+
             if t == "int":
-                return trial.suggest_int(
-                    spec.get("name"),
-                    spec["low"],
-                    spec["high"],
-                    step=spec.get("step", 1),
-                )
+                low = _to_int(spec["low"])
+                high = _to_int(spec["high"])
+                step = _to_int(spec.get("step", 1))
+                return trial.suggest_int(spec["name"], low, high, step=step)
+
             if t == "float":
-                return trial.suggest_float(
-                    spec.get("name"),
-                    spec["low"],
-                    spec["high"],
-                    log=bool(spec.get("log", False)),
-                )
+                low = _to_float(spec["low"])
+                high = _to_float(spec["high"])
+                log = bool(spec.get("log", False))
+                step = spec.get("step", None)
+                step = _to_float(step) if step is not None else None
+                return trial.suggest_float(spec["name"], low, high, log=log, step=step)
+
             if t == "categorical":
-                return trial.suggest_categorical(spec.get("name"), spec["choices"])
+                return trial.suggest_categorical(spec["name"], spec["choices"])
+
             raise ValueError(f"Unknown search space type: {t}")
 
         # Normalize spec: each param dict doesn’t contain name; add it
