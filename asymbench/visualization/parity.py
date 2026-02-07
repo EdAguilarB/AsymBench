@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional, Tuple, Any
+from typing import Any, Dict, Optional, Tuple
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def _safe_float(x: Any) -> float:
@@ -66,13 +66,17 @@ def make_parity_plot(
 
     fig, ax = plt.subplots(figsize=(5.5, 5.5), dpi=300)
 
-    ax.scatter(y_true, y_pred, alpha=0.75, s=25, c='teal')
+    ax.scatter(y_true, y_pred, alpha=0.75, s=25, c="teal")
     ax.plot([lo, hi], [lo, hi], linewidth=1.5)  # identity line
 
     ax.set_xlim(lo, hi)
     ax.set_ylim(lo, hi)
-    ax.set_xlabel("True $\Delta \Delta G^{\ddagger} / kJ \; mol^{-1}$", fontdict={'size':15})
-    ax.set_ylabel("Predicted $\Delta \Delta G^{\ddagger} / kJ \; mol^{-1}$", fontdict={'size':15})
+    ax.set_xlabel(
+        "True $\Delta \Delta G^{\ddagger} / kJ \; mol^{-1}$", fontdict={"size": 15}
+    )
+    ax.set_ylabel(
+        "Predicted $\Delta \Delta G^{\ddagger} / kJ \; mol^{-1}$", fontdict={"size": 15}
+    )
 
     ax.set_title(title, pad=12)
     if subtitle:
