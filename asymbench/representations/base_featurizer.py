@@ -70,6 +70,8 @@ class BaseRepresentation(abc.ABC):
         rep_cfg = self.config.get("representation", {})
         self.rep_type: str = rep_cfg.get("type", self.__class__.__name__)
         self.rep_params: Dict[str, Any] = dict(rep_cfg.get("params", {}))
+        if "feature_name" in self.rep_params:
+            self.rep_type = self.rep_type + self.rep_params["feature_name"]
 
     @abc.abstractmethod
     def transform(self, df: pd.DataFrame) -> pd.DataFrame:
