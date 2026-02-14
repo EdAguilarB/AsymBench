@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "asymbench"
+version = "0.1.0"
+description = "Benchmarking framework for molecular representations and ML models in asymmetric reaction prediction."
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Your Name", email = "your.email@domain.com"}
+]
+keywords = [
+    "cheminformatics",
+    "machine learning",
+    "benchmarking",
+    "asymmetric catalysis",
+    "rdkit",
+    "optuna"
+]
+
+dependencies = [
+    "numpy>=1.22",
+    "pandas>=1.5",
+    "scikit-learn>=1.2",
+    "optuna>=3.0",
+    "matplotlib>=3.6",
+    "scipy>=1.9",
+    "statsmodels>=0.13",
+    "xgboost>=1.7",
+    "pyyaml>=6.0"
+]
+
+[project.optional-dependencies]
+gnn = [
+    "torch>=2.0",
+    "torch-geometric>=2.3"
+]
+
+chem = [
+    "rdkit"
+]
+
+dev = [
+    "black",
+    "ruff",
+    "pytest",
+    "ipykernel"
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/asymbench"
+Repository = "https://github.com/yourusername/asymbench"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["asymbench*"]
+
+[tool.black]
+line-length = 88
+target-version = ["py39"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+select = ["E", "F", "W"]
