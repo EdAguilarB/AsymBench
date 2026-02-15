@@ -118,7 +118,9 @@ class TargetScaler:
         """
         if isinstance(y, pd.DataFrame):
             if y.shape[1] != 1:
-                raise ValueError("TargetScaler expects a single target column.")
+                raise ValueError(
+                    "TargetScaler expects a single target column."
+                )
             y = y.iloc[:, 0]
 
         if isinstance(y, pd.Series):

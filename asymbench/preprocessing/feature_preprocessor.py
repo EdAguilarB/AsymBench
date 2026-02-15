@@ -191,7 +191,9 @@ class FeaturePreprocessor:
         if not isinstance(corr_enabled, bool):
             raise TypeError("correlation_filter['enabled'] must be bool.")
         if not isinstance(corr_threshold, (int, float)):
-            raise TypeError("correlation_filter['threshold'] must be a number.")
+            raise TypeError(
+                "correlation_filter['threshold'] must be a number."
+            )
         if corr_method not in ("pearson", "spearman"):
             raise ValueError(
                 "correlation_filter['method'] must be one of: 'pearson', 'spearman'."

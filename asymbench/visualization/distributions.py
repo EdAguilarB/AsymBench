@@ -90,7 +90,12 @@ def plot_distribution_by_category(
             color = cat_to_color[cat]
             x = rng.normal(loc=i, scale=0.06, size=len(vals))
             ax.scatter(
-                x, vals, s=14, alpha=point_alpha, color=color, edgecolors="none"
+                x,
+                vals,
+                s=14,
+                alpha=point_alpha,
+                color=color,
+                edgecolors="none",
             )
 
     # --- axis styling ---

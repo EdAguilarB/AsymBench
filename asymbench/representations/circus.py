@@ -1,7 +1,9 @@
 import pandas as pd
 from doptools import ChythonCircus
 
-from asymbench.representations.base_featurizer import BaseCorpusSmilesFeaturizer
+from asymbench.representations.base_featurizer import (
+    BaseCorpusSmilesFeaturizer,
+)
 
 
 class CircusFeaturizer(BaseCorpusSmilesFeaturizer):

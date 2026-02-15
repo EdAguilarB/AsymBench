@@ -78,7 +78,10 @@ class BenchmarkRunner:
         seed,
     ):
         # Build representation config
-        rep_config = {"representation": rep_cfg, "data": self.config["dataset"]}
+        rep_config = {
+            "representation": rep_cfg,
+            "data": self.config["dataset"],
+        }
 
         representation = get_representation(rep_config)
 

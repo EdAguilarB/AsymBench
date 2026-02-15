@@ -14,7 +14,11 @@ def atom_features(atom):
 
 
 def bond_features(bond):
-    return [bond.GetBondTypeAsDouble(), bond.GetIsConjugated(), bond.IsInRing()]
+    return [
+        bond.GetBondTypeAsDouble(),
+        bond.GetIsConjugated(),
+        bond.IsInRing(),
+    ]
 
 
 def smiles_to_graph(smiles):
