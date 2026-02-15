@@ -9,6 +9,7 @@ from sklearn.model_selection import KFold, cross_val_score
 
 from asymbench.models.base import get_model
 
+
 def rmse(y_true, y_pred) -> float:
     y_true = np.asarray(y_true)
     y_pred = np.asarray(y_pred)
@@ -56,7 +57,12 @@ class OptunaSklearnOptimizer:
             model = get_model(
                 self.model_cfg["type"], params=self.model_cfg.get("params", {})
             )
-            return model, self.model_cfg.get("params", {}), np.nan, {"enabled": False}
+            return (
+                model,
+                self.model_cfg.get("params", {}),
+                np.nan,
+                {"enabled": False},
+            )
 
         n_trials = int(hpo["n_trials"])
         cv = int(hpo.get("cv", 3))
@@ -77,7 +83,9 @@ class OptunaSklearnOptimizer:
                 log = bool(spec.get("log", False))
                 step = spec.get("step", None)
                 step = _to_float(step) if step is not None else None
-                return trial.suggest_float(spec["name"], low, high, log=log, step=step)
+                return trial.suggest_float(
+                    spec["name"], low, high, log=log, step=step
+                )
 
             if t == "categorical":
                 return trial.suggest_categorical(spec["name"], spec["choices"])
@@ -88,7 +96,9 @@ class OptunaSklearnOptimizer:
         space_named = {k: dict(v, name=k) for k, v in space.items()}
 
         def objective(trial: optuna.Trial) -> float:
-            params = {k: suggest(trial, spec) for k, spec in space_named.items()}
+            params = {
+                k: suggest(trial, spec) for k, spec in space_named.items()
+            }
 
             model = get_model(self.model_cfg["type"], params=params)
 
@@ -106,7 +116,8 @@ class OptunaSklearnOptimizer:
             return float(-scores.mean())
 
         study = optuna.create_study(
-            direction=self.direction, sampler=optuna.samplers.TPESampler(seed=self.seed)
+            direction=self.direction,
+            sampler=optuna.samplers.TPESampler(seed=self.seed),
         )
         study.optimize(objective, n_trials=n_trials, show_progress_bar=True)
 

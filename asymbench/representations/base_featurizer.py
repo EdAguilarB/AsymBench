@@ -34,7 +34,9 @@ class BaseCorpusSmilesFeaturizer(abc.ABC):
 
         self.smiles_cols: List[str] = list(data_cfg.get("smiles_columns", []))
         if not self.smiles_cols:
-            raise KeyError("config['data']['smiles_columns'] must be provided and non-empty")
+            raise KeyError(
+                "config['data']['smiles_columns'] must be provided and non-empty"
+            )
 
         self._is_fitted: bool = False
         self._feature_names: Optional[List[str]] = None
@@ -59,8 +61,13 @@ class BaseCorpusSmilesFeaturizer(abc.ABC):
             "params": self.rep_params,
             "smiles_columns": self.smiles_cols,
             "fitted": self._is_fitted,
-            "n_features": None if self._feature_names is None else len(self._feature_names),
+            "n_features": (
+                None
+                if self._feature_names is None
+                else len(self._feature_names)
+            ),
         }
+
 
 @dataclass
 class BaseRepresentation(abc.ABC):

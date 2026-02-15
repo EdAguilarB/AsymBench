@@ -33,8 +33,4 @@ def evaluate_predictions(y_true, y_pred):
     mae = mean_absolute_error(y_true, y_pred)
     r2 = r2_score(y_true, y_pred)
 
-    return {
-        "rmse": float(rmse),
-        "mae": float(mae),
-        "r2": float(r2),
-    }
+    return {"rmse": float(rmse), "mae": float(mae), "r2": float(r2)}

@@ -2,16 +2,17 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
+
 def plot_distribution_by_category(
     data: pd.DataFrame,
     x_col: str,
     y_col: str,
-    order:list|None=None,
-    figsize:tuple[int,int]=(10, 4),
-    dpi:int=350,
-    show_points:bool=True,
-    point_alpha:float=0.35,
-    title:str|None=None,
+    order: list | None = None,
+    figsize: tuple[int, int] = (10, 4),
+    dpi: int = 350,
+    show_points: bool = True,
+    point_alpha: float = 0.35,
+    title: str | None = None,
     color_map: dict | None = None,
 ):
     """
@@ -37,36 +38,24 @@ def plot_distribution_by_category(
 
     # Order categories by increasing mean of y_col
     if order is None:
-        order = (
-            df.groupby(x_col)[y_col]
-            .mean()
-            .sort_values()
-            .index
-            .tolist()
-        )
+        order = df.groupby(x_col)[y_col].mean().sort_values().index.tolist()
 
     groups = [df.loc[df[x_col] == cat, y_col].to_numpy() for cat in order]
 
     # --- Color handling ---
     if color_map is not None:
-        cat_to_color = {
-            cat: color_map.get(cat, "gray") for cat in order
-        }
+        cat_to_color = {cat: color_map.get(cat, "gray") for cat in order}
     else:
         colors = plt.cm.tab10.colors
         cat_to_color = {
-            cat: colors[i % len(colors)]
-            for i, cat in enumerate(order)
+            cat: colors[i % len(colors)] for i, cat in enumerate(order)
         }
 
     fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
 
     # --- violin plot ---
     parts = ax.violinplot(
-        groups,
-        showmeans=False,
-        showmedians=False,
-        showextrema=False,
+        groups, showmeans=False, showmedians=False, showextrema=False
     )
 
     # Color each violin
@@ -101,12 +90,7 @@ def plot_distribution_by_category(
             color = cat_to_color[cat]
             x = rng.normal(loc=i, scale=0.06, size=len(vals))
             ax.scatter(
-                x,
-                vals,
-                s=14,
-                alpha=point_alpha,
-                color=color,
-                edgecolors="none",
+                x, vals, s=14, alpha=point_alpha, color=color, edgecolors="none"
             )
 
     # --- axis styling ---

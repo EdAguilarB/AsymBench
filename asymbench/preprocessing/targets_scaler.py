@@ -34,13 +34,17 @@ class TargetScaler:
 
     def __post_init__(self):
         if self.scaling not in ("none", "standard", "minmax"):
-            raise ValueError("scaling must be one of: 'none', 'standard', 'minmax'")
+            raise ValueError(
+                "scaling must be one of: 'none', 'standard', 'minmax'"
+            )
 
     # -------------------------
     # Public API
     # -------------------------
 
-    def fit(self, y: Union[np.ndarray, pd.Series, pd.DataFrame]) -> "TargetScaler":
+    def fit(
+        self, y: Union[np.ndarray, pd.Series, pd.DataFrame]
+    ) -> "TargetScaler":
         y_arr = self._to_1d_array(y)
 
         if self.scaling == "standard":
@@ -57,7 +61,9 @@ class TargetScaler:
         self.fitted_ = True
         return self
 
-    def transform(self, y: Union[np.ndarray, pd.Series, pd.DataFrame]) -> np.ndarray:
+    def transform(
+        self, y: Union[np.ndarray, pd.Series, pd.DataFrame]
+    ) -> np.ndarray:
         if not self.fitted_:
             raise RuntimeError("TargetScaler.transform called before fit().")
 
@@ -78,7 +84,9 @@ class TargetScaler:
         self, y_scaled: Union[np.ndarray, pd.Series, pd.DataFrame]
     ) -> np.ndarray:
         if not self.fitted_:
-            raise RuntimeError("TargetScaler.inverse_transform called before fit().")
+            raise RuntimeError(
+                "TargetScaler.inverse_transform called before fit()."
+            )
 
         y_arr = self._to_1d_array(y_scaled)
 
@@ -102,7 +110,9 @@ class TargetScaler:
     # Utilities
     # -------------------------
 
-    def _to_1d_array(self, y: Union[np.ndarray, pd.Series, pd.DataFrame]) -> np.ndarray:
+    def _to_1d_array(
+        self, y: Union[np.ndarray, pd.Series, pd.DataFrame]
+    ) -> np.ndarray:
         """
         Convert input to 1D numpy array.
         """

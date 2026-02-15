@@ -72,10 +72,12 @@ def make_parity_plot(
     ax.set_xlim(lo, hi)
     ax.set_ylim(lo, hi)
     ax.set_xlabel(
-        "True $\Delta \Delta G^{\ddagger} / kJ \; mol^{-1}$", fontdict={"size": 15}
+        "True $\Delta \Delta G^{\ddagger} / kJ \; mol^{-1}$",
+        fontdict={"size": 15},
     )
     ax.set_ylabel(
-        "Predicted $\Delta \Delta G^{\ddagger} / kJ \; mol^{-1}$", fontdict={"size": 15}
+        "Predicted $\Delta \Delta G^{\ddagger} / kJ \; mol^{-1}$",
+        fontdict={"size": 15},
     )
 
     ax.set_title(title, pad=12)

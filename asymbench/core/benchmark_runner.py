@@ -68,13 +68,17 @@ class BenchmarkRunner:
         return results
 
     def _build_experiment(
-        self, rep_cfg, pre_cfg, y_scl_cfg, model_cfg, split_cfg, split_by_mol_col, seed
+        self,
+        rep_cfg,
+        pre_cfg,
+        y_scl_cfg,
+        model_cfg,
+        split_cfg,
+        split_by_mol_col,
+        seed,
     ):
         # Build representation config
-        rep_config = {
-            "representation": rep_cfg,
-            "data": self.config["dataset"],
-        }
+        rep_config = {"representation": rep_cfg, "data": self.config["dataset"]}
 
         representation = get_representation(rep_config)
 

@@ -84,7 +84,9 @@ def friedman_wilcoxon_by_group(
     df["_replicate_id"] = df[replicate_cols].astype(str).agg("__".join, axis=1)
 
     # Pivot to wide: rows=replicates, cols=groups
-    table = df.pivot_table(index="_replicate_id", columns=x_col, values=y_col, aggfunc="mean")
+    table = df.pivot_table(
+        index="_replicate_id", columns=x_col, values=y_col, aggfunc="mean"
+    )
 
     if dropna == "any":
         table = table.dropna(axis=0, how="any")
@@ -102,7 +104,9 @@ def friedman_wilcoxon_by_group(
     n, k = table.shape
 
     # --- Friedman ---
-    fried_stat, fried_p = friedmanchisquare(*[table[g].to_numpy() for g in groups])
+    fried_stat, fried_p = friedmanchisquare(
+        *[table[g].to_numpy() for g in groups]
+    )
 
     # --- Pairwise Wilcoxon ---
     pairs = list(combinations(groups, 2))
@@ -116,7 +120,9 @@ def friedman_wilcoxon_by_group(
 
         # Wilcoxon can error if all diffs are 0; handle gracefully
         try:
-            stat, p = wilcoxon(xa, xb, alternative=alternative, zero_method="wilcox")
+            stat, p = wilcoxon(
+                xa, xb, alternative=alternative, zero_method="wilcox"
+            )
         except ValueError:
             stat, p = np.nan, 1.0
 
@@ -132,15 +138,24 @@ def friedman_wilcoxon_by_group(
             }
         )
 
-    reject, p_corr, _, _ = multipletests(raw_pvals, alpha=alpha, method=correction)
+    reject, p_corr, _, _ = multipletests(
+        raw_pvals, alpha=alpha, method=correction
+    )
 
     pairwise = pd.DataFrame(rows)
     pairwise["p_value_corrected"] = p_corr
     pairwise["reject_null"] = reject
-    pairwise = pairwise.sort_values(["p_value_corrected", "p_value"]).reset_index(drop=True)
+    pairwise = pairwise.sort_values(
+        ["p_value_corrected", "p_value"]
+    ).reset_index(drop=True)
 
     out = {
-        "friedman": {"statistic": float(fried_stat), "p_value": float(fried_p), "n": int(n), "k": int(k)},
+        "friedman": {
+            "statistic": float(fried_stat),
+            "p_value": float(fried_p),
+            "n": int(n),
+            "k": int(k),
+        },
         "pairwise": pairwise,
         "table_used": table,
     }
@@ -152,7 +167,9 @@ def friedman_wilcoxon_by_group(
         print(f"statistic = {fried_stat:.6g}")
         print(f"p-value   = {fried_p:.6g}")
 
-        print(f"\n=== Pairwise Wilcoxon ({correction} corrected, alpha={alpha}) ===")
+        print(
+            f"\n=== Pairwise Wilcoxon ({correction} corrected, alpha={alpha}) ==="
+        )
         for _, r in pairwise.iterrows():
             sig = "YES" if r["reject_null"] else "no"
             print(

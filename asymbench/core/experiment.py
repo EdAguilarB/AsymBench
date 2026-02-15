@@ -47,7 +47,9 @@ class Experiment:
         model_type = self.model_cfg.get("type", None)
 
         signature = self._run_signature(model_type=model_type)
-        print(f"Running experiment with the following configuration:\n{signature}")
+        print(
+            f"Running experiment with the following configuration:\n{signature}"
+        )
         if self.run_store.exists_complete(signature):
             metrics = self.run_store.load_metrics(signature)
             metrics["cache_hit"] = True
@@ -73,7 +75,9 @@ class Experiment:
             df_test = self.dataset.iloc[test_idxs]
 
             # 4) Create representation
-            X_train, X_test = self._fit_transform_representation(df_train, df_test)
+            X_train, X_test = self._fit_transform_representation(
+                df_train, df_test
+            )
             y_train = y.iloc[train_idxs]
             y_test = y.iloc[test_idxs]
 
@@ -84,8 +88,8 @@ class Experiment:
             y_test = self.y_scaling.transform(y_test)
 
             # 6) HPO on train
-            best_model, best_params, best_cv_score, hpo_meta = self.optimizer.optimize(
-                X_train, y_train
+            best_model, best_params, best_cv_score, hpo_meta = (
+                self.optimizer.optimize(X_train, y_train)
             )
 
             # 7) Fit best model on train and predict on test
@@ -109,16 +113,18 @@ class Experiment:
                         "rep_type",
                         type(self.representation).__name__,
                     ),
-                    "split_sampler": getattr(self.split_strategy, "config", {}).get(
-                        "sampler"
-                    ),
-                    "train_size": getattr(self.split_strategy, "config", {}).get(
-                        "train_size"
-                    ),
+                    "split_sampler": getattr(
+                        self.split_strategy, "config", {}
+                    ).get("sampler"),
+                    "train_size": getattr(
+                        self.split_strategy, "config", {}
+                    ).get("train_size"),
                     "seed": self.seed,
                     "best_params": best_params,
                     "best_cv_score": (
-                        float(best_cv_score) if best_cv_score is not None else None
+                        float(best_cv_score)
+                        if best_cv_score is not None
+                        else None
                     ),
                     "hpo_meta": hpo_meta,
                     "n_features": int(X_train.shape[1]),
@@ -150,7 +156,7 @@ class Experiment:
         if hasattr(rep, "fit"):
             rep.fit(df_train)
         X_train = rep.transform(df_train)
-        X_test  = rep.transform(df_test)
+        X_test = rep.transform(df_test)
         return X_train, X_test
 
     def _run_signature(self, model_type: str) -> dict:
@@ -171,9 +177,7 @@ class Experiment:
         train_size = split_cfg.get("train_size", None)
 
         return {
-            "representation": {
-                "type": rep_type,
-            },
+            "representation": {"type": rep_type},
             "model": {"type": model_type},
             "split": {
                 "sampler": sampler,

@@ -151,7 +151,9 @@ class RunStore:
         _atomic_write_json(self.metrics_path(signature), metrics)
         _atomic_write_json(self.status_path(signature), {"state": "completed"})
 
-    def mark_failed(self, signature: Dict[str, Any], exc: BaseException) -> None:
+    def mark_failed(
+        self, signature: Dict[str, Any], exc: BaseException
+    ) -> None:
         _atomic_write_json(
             self.status_path(signature),
             {

@@ -20,7 +20,9 @@ class CircusFeaturizer(BaseCorpusSmilesFeaturizer):
         blocks = []
         for col, gen in zip(self.smiles_cols, self._generators):
             X_col = gen.transform(df[col])
-            X_col = X_col.rename(columns={c: f"{col}__{c}" for c in X_col.columns})
+            X_col = X_col.rename(
+                columns={c: f"{col}__{c}" for c in X_col.columns}
+            )
             blocks.append(X_col)
 
         X = pd.concat(blocks, axis=1)

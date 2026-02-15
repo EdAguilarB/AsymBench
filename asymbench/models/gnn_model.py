@@ -5,12 +5,13 @@ from asymbench.gnn.model import ReactionGNN
 
 class GNNWrapper:
     def __init__(self, config, in_dim, num_mols):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu"
+        )
 
-        self.model = ReactionGNN(
-            num_mols=num_mols,
-            in_dim=in_dim,
-        ).to(self.device)
+        self.model = ReactionGNN(num_mols=num_mols, in_dim=in_dim).to(
+            self.device
+        )
 
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
 

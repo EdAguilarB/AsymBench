@@ -7,7 +7,21 @@ from typing import Any, Dict
 def _slug(x: Any) -> str:
     s = str(x).strip().replace(" ", "")
     # keep it filesystem-friendly
-    for ch in ["/", "\\", ":", ";", ",", "{", "}", "[", "]", "(", ")", "'", '"']:
+    for ch in [
+        "/",
+        "\\",
+        ":",
+        ";",
+        ",",
+        "{",
+        "}",
+        "[",
+        "]",
+        "(",
+        ")",
+        "'",
+        '"',
+    ]:
         s = s.replace(ch, "_")
     return s
 

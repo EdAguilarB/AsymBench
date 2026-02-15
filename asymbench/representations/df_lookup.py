@@ -52,7 +52,9 @@ class DataFrameLookupRepresentation(BaseRepresentation):
         # keep only requested columns
         if self.feature_columns is not None:
             missing = [
-                c for c in self.feature_columns if c not in self._features.columns
+                c
+                for c in self.feature_columns
+                if c not in self._features.columns
             ]
             if missing:
                 raise KeyError(
@@ -61,11 +63,15 @@ class DataFrameLookupRepresentation(BaseRepresentation):
             self._features = self._features.loc[:, self.feature_columns]
 
         # prefix column names to avoid collisions with other reps / metadata
-        self._features.columns = [f"{self.prefix}__{c}" for c in self._features.columns]
+        self._features.columns = [
+            f"{self.prefix}__{c}" for c in self._features.columns
+        ]
 
     def _load_features(self) -> pd.DataFrame:
         if not self.features_path.exists():
-            raise FileNotFoundError(f"Features file not found: {self.features_path}")
+            raise FileNotFoundError(
+                f"Features file not found: {self.features_path}"
+            )
 
         if self.features_path.suffix.lower() in [".parquet"]:
             feats = pd.read_parquet(self.features_path)
@@ -95,7 +101,9 @@ class DataFrameLookupRepresentation(BaseRepresentation):
             keys = df.index
         else:
             if self.join_key not in df.columns:
-                raise KeyError(f"join_key='{self.join_key}' not in dataset columns.")
+                raise KeyError(
+                    f"join_key='{self.join_key}' not in dataset columns."
+                )
             keys = df[self.join_key]
 
         # Align features in the same order as df
