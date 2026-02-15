@@ -8,7 +8,6 @@ from asymbench.optimization.optuna_optimizer import OptunaSklearnOptimizer
 from asymbench.preprocessing.feature_preprocessor import FeaturePreprocessor
 from asymbench.preprocessing.targets_scaler import TargetScaler
 from asymbench.representations.base_featurizer import BaseSmilesFeaturizer
-from asymbench.utils.run_paths import build_run_dir
 from asymbench.utils.run_store import RunStore
 from asymbench.visualization.parity import make_parity_plot
 
