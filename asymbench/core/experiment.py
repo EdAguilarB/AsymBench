@@ -65,9 +65,6 @@ class Experiment:
             split_by_mols = self.dataset.loc[:, self.split_by_mol_col]
             y = self.dataset.loc[:, self.target]
 
-            # 3) Create representation
-            #X = self.representation.transform(self.dataset)
-
             # 3) split the data
             train_idxs, test_idxs = self.split_strategy.get_splits(
                 mols=split_by_mols, y=y
