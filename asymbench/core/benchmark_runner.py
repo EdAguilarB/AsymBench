@@ -104,9 +104,11 @@ class BenchmarkRunner:
             optimizer=optimizer,
             split_strategy=split_strategy,
             seed=seed,
+            cache_dir=self.config["log_dirs"]["runs"],
         )
 
     def _save_results(self, results):
-        Path("experiments/results").mkdir(parents=True, exist_ok=True)
-        with open("experiments/results/raw_results.json", "w") as f:
+        log_dir = self.config["log_dirs"]["benchmark"]
+        Path(log_dir).mkdir(parents=True, exist_ok=True)
+        with open(f"{log_dir}/raw_results.json", "w") as f:
             json.dump(results, f, indent=2)

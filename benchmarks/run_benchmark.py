@@ -11,7 +11,7 @@ def main():
     results = runner.run()
 
     summary = aggregate_results(results)
-    summary.to_csv("experiments/results/summary.csv", index=False)
+    summary.to_csv(f"{config['log_dirs']['benchmark']}/summary.csv", index=False)
 
 
 if __name__ == "__main__":
