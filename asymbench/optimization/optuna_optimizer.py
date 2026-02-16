@@ -55,7 +55,9 @@ class OptunaSklearnOptimizer:
         hpo = self.model_cfg.get("hpo", {}) or {}
         if not hpo.get("enabled", False):
             model = get_model(
-                self.model_cfg["type"], params=self.model_cfg.get("params", {})
+                self.model_cfg["type"],
+                params=self.model_cfg.get("params", {}),
+                seed=self.seed,
             )
             return (
                 model,
@@ -100,7 +102,9 @@ class OptunaSklearnOptimizer:
                 k: suggest(trial, spec) for k, spec in space_named.items()
             }
 
-            model = get_model(self.model_cfg["type"], params=params)
+            model = get_model(
+                self.model_cfg["type"], params=params, seed=self.seed
+            )
 
             # Use sklearn CV and neg RMSE
             kf = KFold(n_splits=cv, shuffle=True, random_state=self.seed)
@@ -123,7 +127,9 @@ class OptunaSklearnOptimizer:
 
         best_params = dict(study.best_params)
         best_score = float(study.best_value)  # RMSE
-        best_model = get_model(self.model_cfg["type"], params=best_params)
+        best_model = get_model(
+            self.model_cfg["type"], params=best_params, seed=self.seed
+        )
 
         meta = {
             "enabled": True,
