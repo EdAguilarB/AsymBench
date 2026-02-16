@@ -1,5 +1,5 @@
-import pandas as pd
 from doptools import ChythonCircus
+import pandas as pd
 
 from asymbench.representations.base_featurizer import (
     BaseCorpusSmilesFeaturizer,

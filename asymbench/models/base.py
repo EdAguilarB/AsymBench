@@ -1,7 +1,7 @@
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.neural_network import MLPRegressor
 from sklearn.svm import SVR
 from xgboost import XGBRegressor
-from sklearn.neural_network import MLPRegressor
 
 from asymbench.models.gnn_model import GNNWrapper
 

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import json
-import traceback
 from dataclasses import dataclass
+import json
 from pathlib import Path
+import traceback
 from typing import Any, Dict
 
 

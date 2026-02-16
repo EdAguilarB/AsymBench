@@ -1,7 +1,8 @@
-import pandas as pd
-import numpy as np
-from scipy.stats import friedmanchisquare, wilcoxon
 from itertools import combinations
+
+import numpy as np
+import pandas as pd
+from scipy.stats import friedmanchisquare, wilcoxon
 from statsmodels.stats.multitest import multipletests
 
 
