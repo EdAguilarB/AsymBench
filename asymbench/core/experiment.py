@@ -81,8 +81,8 @@ class Experiment:
             y_test = y.iloc[test_idxs]
 
             # 5) preprocess the data
-            X_train = self.preprocessing.fit_transform(X_train)
-            X_test = self.preprocessing.transform(X_test)
+            X_train = self.preprocessing.fit_transform(X_train).to_numpy()
+            X_test = self.preprocessing.transform(X_test).to_numpy()
             y_train = self.y_scaling.fit_transform(y_train)
             y_test = self.y_scaling.transform(y_test)
 
