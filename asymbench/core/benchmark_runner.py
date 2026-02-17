@@ -17,6 +17,10 @@ class BenchmarkRunner:
 
         # Load dataset once
         self.dataset = load_dataset(config["dataset"])
+        if config.get("external_test_set", False):
+            self.external_test = load_dataset(config["external_test_set"])
+        else:
+            self.external_test = None
 
     def run(self):
         results = []
@@ -105,6 +109,7 @@ class BenchmarkRunner:
             split_strategy=split_strategy,
             seed=seed,
             cache_dir=self.config["log_dirs"]["runs"],
+            external_test_set=self.external_test,
         )
 
     def _save_results(self, results):
