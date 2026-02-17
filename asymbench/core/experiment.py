@@ -10,6 +10,8 @@ from asymbench.preprocessing.targets_scaler import TargetScaler
 from asymbench.representations.base_featurizer import BaseSmilesFeaturizer
 from asymbench.utils.run_store import RunStore
 from asymbench.visualization.parity import make_parity_plot
+from asymbench.explainability.shap_explainer import ShapExplainer
+from asymbench.utils.feature_names import FeatureNameSanitizer
 
 
 class Experiment:
@@ -26,6 +28,7 @@ class Experiment:
         split_strategy: MoleculeSplitter,
         seed: int,
         cache_dir: Path = Path("experiment_runs"),
+        external_test_set: pd.DataFrame | None = None,
     ):
         self.dataset = dataset
         self.smiles_columns = smiles_columns
@@ -40,6 +43,7 @@ class Experiment:
         self.cache_dir = cache_dir
         self.run_store = RunStore(base_dir=self.cache_dir)
         self.model_cfg = getattr(self.optimizer, "model_cfg", None)
+        self.external_test_set = external_test_set
 
     def run(self):
 
@@ -67,22 +71,22 @@ class Experiment:
             y = self.dataset.loc[:, self.target]
 
             # 3) split the data
-            train_idxs, test_idxs = self.split_strategy.get_splits(
-                mols=split_by_mols, y=y
+            df_train, df_test, y_train, y_test = self.split_strategy.get_train_test_set(
+                data=self.dataset, mols=split_by_mols, y=y, external_test=self.external_test_set
             )
-            df_train = self.dataset.iloc[train_idxs]
-            df_test = self.dataset.iloc[test_idxs]
 
             # 4) Create representation
             X_train, X_test = self._fit_transform_representation(
                 df_train, df_test
             )
-            y_train = y.iloc[train_idxs]
-            y_test = y.iloc[test_idxs]
 
             # 5) preprocess the data
-            X_train = self.preprocessing.fit_transform(X_train).to_numpy()
-            X_test = self.preprocessing.transform(X_test).to_numpy()
+            X_train = self.preprocessing.fit_transform(X_train)
+            X_test = self.preprocessing.transform(X_test)
+            name_sanitizer = FeatureNameSanitizer()
+            X_train = name_sanitizer.fit_transform(X_train)
+            X_test = name_sanitizer.transform(X_test)
+
             y_train = self.y_scaling.fit_transform(y_train)
             y_test = self.y_scaling.transform(y_test)
 
@@ -95,9 +99,20 @@ class Experiment:
             best_model.fit(X_train, y_train)
             preds_test = best_model.predict(X_test)
 
+            expl_dir = run_dir / "explainability"
+            shapx = ShapExplainer(max_background=200, max_explain=500, seed=self.seed).fit(best_model, X_train)
+            shap_artifacts_train = shapx.explain(X_train, outdir=expl_dir, prefix="train")
+            shap_artifacts_test  = shapx.explain(X_test,  outdir=expl_dir, prefix="test")
+
             # 8) inverse transform
             y_test = self.y_scaling.inverse_transform(y_test)
             preds_test = self.y_scaling.inverse_transform(preds_test)
+
+            results = pd.DataFrame({
+                X_test.index.name: X_test.index,
+                "y": y_test,
+                "y_pred": preds_test
+            }).to_csv(run_dir / "preds.csv", index=False)
 
             metrics = evaluate_predictions(y_test, preds_test)
 
