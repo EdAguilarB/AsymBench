@@ -147,15 +147,7 @@ models:
 ### 3. Run the benchmark
 
 ``` bash
-python benchmarks/run_benchmark.py
-```
-
-Results will be saved in:
-```
-experiments/
-├── runs/
-├── plots/
-└── results/
+python -m benchmarks/run_benchmark.py --config path/to/yaml/config.yaml
 ```
 
 ---
@@ -217,4 +209,4 @@ Coming soon :)
 MIT License
 
 ## Contact
-Eduardo Aguilar: eduardo.aguilar-bejarano@gmail.com
+Eduardo Aguilar: ed.aguilar.bejarano@gmail.com
