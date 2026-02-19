@@ -17,6 +17,10 @@ class BenchmarkRunner:
 
         # Load dataset once
         self.dataset = load_dataset(config["dataset"])
+        if config.get("external_test_set", False):
+            self.external_test = load_dataset(config["external_test_set"])
+        else:
+            self.external_test = None
 
     def run(self):
         results = []
@@ -68,7 +72,14 @@ class BenchmarkRunner:
         return results
 
     def _build_experiment(
-        self, rep_cfg, pre_cfg, y_scl_cfg, model_cfg, split_cfg, split_by_mol_col, seed
+        self,
+        rep_cfg,
+        pre_cfg,
+        y_scl_cfg,
+        model_cfg,
+        split_cfg,
+        split_by_mol_col,
+        seed,
     ):
         # Build representation config
         rep_config = {
@@ -97,9 +108,12 @@ class BenchmarkRunner:
             optimizer=optimizer,
             split_strategy=split_strategy,
             seed=seed,
+            cache_dir=self.config["log_dirs"]["runs"],
+            external_test_set=self.external_test,
         )
 
     def _save_results(self, results):
-        Path("experiments/results").mkdir(parents=True, exist_ok=True)
-        with open("experiments/results/raw_results.json", "w") as f:
+        log_dir = self.config["log_dirs"]["benchmark"]
+        Path(log_dir).mkdir(parents=True, exist_ok=True)
+        with open(f"{log_dir}/raw_results.json", "w") as f:
             json.dump(results, f, indent=2)

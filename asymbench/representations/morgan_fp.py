@@ -12,8 +12,7 @@ class MorganFeaturizer(BaseSmilesFeaturizer):
 
         # Create generator once
         self._generator = rdFingerprintGenerator.GetMorganGenerator(
-            radius=self.radius,
-            fpSize=self.n_bits,
+            radius=self.radius, fpSize=self.n_bits
         )
 
     @property

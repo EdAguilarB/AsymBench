@@ -1,5 +1,5 @@
-import torch
 from rdkit import Chem
+import torch
 from torch_geometric.data import Data
 
 

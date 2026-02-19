@@ -82,13 +82,17 @@ class FeaturePreprocessor:
             self.scaler_params_ = self._fit_scaler(X, method=self.scaling)
 
         self.kept_columns_ = kept
-        self.dropped_columns_ = [c for c in cols_initial if c not in self.kept_columns_]
+        self.dropped_columns_ = [
+            c for c in cols_initial if c not in self.kept_columns_
+        ]
         self.fitted_ = True
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         if not self.fitted_:
-            raise RuntimeError("FeaturePreprocessor.transform called before fit().")
+            raise RuntimeError(
+                "FeaturePreprocessor.transform called before fit()."
+            )
 
         X = self._validate_input(X, stage="transform")
 
@@ -102,7 +106,9 @@ class FeaturePreprocessor:
         X_out = X.loc[:, self.kept_columns_].copy()
 
         if self.scaling != "none":
-            X_out = self._apply_scaler(X_out, self.scaler_params_, method=self.scaling)
+            X_out = self._apply_scaler(
+                X_out, self.scaler_params_, method=self.scaling
+            )
 
         return X_out
 
@@ -163,9 +169,13 @@ class FeaturePreprocessor:
         corr = self._require(fs, "correlation_filter", "feature_selection")
 
         if not isinstance(var, dict):
-            raise TypeError("feature_selection['variance_filter'] must be a dict.")
+            raise TypeError(
+                "feature_selection['variance_filter'] must be a dict."
+            )
         if not isinstance(corr, dict):
-            raise TypeError("feature_selection['correlation_filter'] must be a dict.")
+            raise TypeError(
+                "feature_selection['correlation_filter'] must be a dict."
+            )
 
         var_enabled = self._require(var, "enabled", "variance_filter")
         var_threshold = self._require(var, "threshold", "variance_filter")
@@ -181,7 +191,9 @@ class FeaturePreprocessor:
         if not isinstance(corr_enabled, bool):
             raise TypeError("correlation_filter['enabled'] must be bool.")
         if not isinstance(corr_threshold, (int, float)):
-            raise TypeError("correlation_filter['threshold'] must be a number.")
+            raise TypeError(
+                "correlation_filter['threshold'] must be a number."
+            )
         if corr_method not in ("pearson", "spearman"):
             raise ValueError(
                 "correlation_filter['method'] must be one of: 'pearson', 'spearman'."
@@ -195,7 +207,9 @@ class FeaturePreprocessor:
 
         fill_value = opt.get("fill_value", 0.0)
         if not isinstance(fill_value, (int, float)):
-            raise TypeError("preprocessing_options['fill_value'] must be a number.")
+            raise TypeError(
+                "preprocessing_options['fill_value'] must be a number."
+            )
 
         # Store parsed values
         self.scaling: ScalerType = scaling
@@ -217,7 +231,9 @@ class FeaturePreprocessor:
         if not isinstance(X, pd.DataFrame):
             raise TypeError(f"X must be a pandas.DataFrame, got {type(X)}")
 
-        non_numeric = [c for c in X.columns if not pd.api.types.is_numeric_dtype(X[c])]
+        non_numeric = [
+            c for c in X.columns if not pd.api.types.is_numeric_dtype(X[c])
+        ]
         if non_numeric:
             raise TypeError(
                 f"All columns must be numeric for preprocessing. Found non-numeric columns: {non_numeric[:5]}"
@@ -265,7 +281,9 @@ class FeaturePreprocessor:
     # Scaling
     # -------------------------
 
-    def _fit_scaler(self, X: pd.DataFrame, method: ScalerType) -> Dict[str, Any]:
+    def _fit_scaler(
+        self, X: pd.DataFrame, method: ScalerType
+    ) -> Dict[str, Any]:
         arr = X.to_numpy(dtype=float)
 
         if method == "standard":

@@ -49,10 +49,24 @@ class DataFrameLookupRepresentation(BaseRepresentation):
 
         self._features = self._load_features()
 
+        self._features.index = _canonicalize_keys(self._features.index)
+
+        if not self._features.index.is_unique:
+            dupes = (
+                self._features.index[self._features.index.duplicated()]
+                .unique()
+                .tolist()[:10]
+            )
+            raise ValueError(
+                f"Features index is not unique. Example duplicate keys: {dupes}"
+            )
+
         # keep only requested columns
         if self.feature_columns is not None:
             missing = [
-                c for c in self.feature_columns if c not in self._features.columns
+                c
+                for c in self.feature_columns
+                if c not in self._features.columns
             ]
             if missing:
                 raise KeyError(
@@ -61,11 +75,15 @@ class DataFrameLookupRepresentation(BaseRepresentation):
             self._features = self._features.loc[:, self.feature_columns]
 
         # prefix column names to avoid collisions with other reps / metadata
-        self._features.columns = [f"{self.prefix}__{c}" for c in self._features.columns]
+        self._features.columns = [
+            f"{self.prefix}__{c}" for c in self._features.columns
+        ]
 
     def _load_features(self) -> pd.DataFrame:
         if not self.features_path.exists():
-            raise FileNotFoundError(f"Features file not found: {self.features_path}")
+            raise FileNotFoundError(
+                f"Features file not found: {self.features_path}"
+            )
 
         if self.features_path.suffix.lower() in [".parquet"]:
             feats = pd.read_parquet(self.features_path)
@@ -92,11 +110,15 @@ class DataFrameLookupRepresentation(BaseRepresentation):
     def transform(self, df: pd.DataFrame) -> pd.DataFrame:
         # Determine lookup keys
         if self.join_key is None:
-            keys = df.index
+            raw_keys = df.index
         else:
             if self.join_key not in df.columns:
-                raise KeyError(f"join_key='{self.join_key}' not in dataset columns.")
-            keys = df[self.join_key]
+                raise KeyError(
+                    f"join_key='{self.join_key}' not in dataset columns."
+                )
+            raw_keys = df[self.join_key]
+
+        keys = _canonicalize_keys(raw_keys)
 
         # Align features in the same order as df
         # Reindex preserves order and introduces NaN for missing keys
@@ -137,3 +159,29 @@ class DataFrameLookupRepresentation(BaseRepresentation):
             },
             "n_features": int(self._features.shape[1]),
         }
+
+
+def _canonicalize_keys(
+    values, *, dtype: str = "str", strip: bool = True, lower: bool = False
+):
+    """
+    Return a pd.Index of canonical keys safe for reindexing.
+    """
+    s = pd.Series(values)
+
+    # Handle missing
+    # (keep NA as <NA> so you can detect them)
+    if dtype == "str":
+        s = s.astype("string")
+        if strip:
+            s = s.str.strip()
+        if lower:
+            s = s.str.lower()
+        return pd.Index(s)
+
+    if dtype == "int":
+        # strict integer conversion; throws if non-int-like values exist
+        s = pd.to_numeric(s, errors="raise").astype("int64")
+        return pd.Index(s)
+
+    raise ValueError("dtype must be 'str' or 'int'")

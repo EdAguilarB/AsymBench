@@ -1,68 +1,41 @@
-[build-system]
-requires = ["setuptools>=65", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "asymbench"
 version = "0.1.0"
 description = "Benchmarking framework for molecular representations and ML models in asymmetric reaction prediction."
-readme = "README.md"
-requires-python = ">=3.9"
-license = {text = "MIT"}
 authors = [
-    {name = "Your Name", email = "your.email@domain.com"}
+    {name = "Eduardo Aguilar",email = "ed.aguilar.bejarano@gmail.com"}
 ]
-keywords = [
-    "cheminformatics",
-    "machine learning",
-    "benchmarking",
-    "asymmetric catalysis",
-    "rdkit",
-    "optuna"
-]
-
+license = {text = "MIT License"}
+readme = "README.md"
+requires-python = ">=3.11"
 dependencies = [
-    "numpy>=1.22",
-    "pandas>=1.5",
-    "scikit-learn>=1.2",
-    "optuna>=3.0",
-    "matplotlib>=3.6",
-    "scipy>=1.9",
-    "statsmodels>=0.13",
-    "xgboost>=1.7",
-    "pyyaml>=6.0"
+    "pandas (>=3.0.0,<4.0.0)",
+    "numpy (>=2.4.2,<3.0.0)",
+    "scikit-learn (>=1.8.0,<2.0.0)",
+    "rdkit (>=2025.9.4,<2026.0.0)",
+    "optuna (>=4.7.0,<5.0.0)",
+    "pyyaml (>=6.0.3,<7.0.0)",
+    "shap (>=0.50.0,<0.51.0)",
+    "matplotlib (>=3.10.8,<4.0.0)",
+    "seaborn (>=0.13.2,<0.14.0)",
+    "black (>=26.1.0,<27.0.0)",
+    "isort (>=7.0.0,<8.0.0)",
+    "flake8 (>=7.3.0,<8.0.0)",
+    "doptools (>=1.3.9,<2.0.0)"
 ]
 
-[project.optional-dependencies]
-gnn = [
-    "torch>=2.0",
-    "torch-geometric>=2.3"
-]
 
-chem = [
-    "rdkit"
-]
-
-dev = [
-    "black",
-    "ruff",
-    "pytest",
-    "ipykernel"
-]
-
-[project.urls]
-Homepage = "https://github.com/yourusername/asymbench"
-Repository = "https://github.com/yourusername/asymbench"
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["asymbench*"]
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
 
 [tool.black]
-line-length = 88
-target-version = ["py39"]
+line-length = 79
+target-version = ["py311"]
+skip-magic-trailing-comma = true
+required-version = "26"
 
-[tool.ruff]
-line-length = 88
-target-version = "py39"
-select = ["E", "F", "W"]
+[tool.isort]
+profile = "black"
+line_length = 79
+force_sort_within_sections = true
