@@ -88,9 +88,11 @@ class ShapExplainer:
             X_eval = X.sample(self.max_explain, random_state=self.seed)
 
         if self._uses_tree_explainer:
-            shap_values = self.explainer_(X_eval)      # works for trees
+            shap_values = self.explainer_(X_eval)  # works for trees
         else:
-            shap_values = self.explainer_(X_eval)      # callable path works for SVR/MLP
+            shap_values = self.explainer_(
+                X_eval
+            )  # callable path works for SVR/MLP
 
         # ---- global importance table ----
         # mean absolute shap per feature
@@ -101,7 +103,9 @@ class ShapExplainer:
         mean_abs = np.mean(np.abs(vals), axis=0)
 
         importance = (
-            pd.DataFrame({"feature": X_eval.columns, "mean_abs_shap": mean_abs})
+            pd.DataFrame(
+                {"feature": X_eval.columns, "mean_abs_shap": mean_abs}
+            )
             .sort_values("mean_abs_shap", ascending=False)
             .reset_index(drop=True)
         )
@@ -117,7 +121,9 @@ class ShapExplainer:
         if make_plots:
             # (1) beeswarm summary (global)
             fig = plt.figure()
-            shap.summary_plot(shap_values, X_eval, show=False, max_display=top_k)
+            shap.summary_plot(
+                shap_values, X_eval, show=False, max_display=top_k
+            )
             p = outdir / f"{prefix}_shap_summary_beeswarm.png"
             plt.tight_layout()
             plt.savefig(p, dpi=350, bbox_inches="tight")
@@ -137,7 +143,9 @@ class ShapExplainer:
         Local explanation for one sample (waterfall plot).
         """
         if self.explainer_ is None:
-            raise RuntimeError("ShapExplainer.explain_single called before fit().")
+            raise RuntimeError(
+                "ShapExplainer.explain_single called before fit()."
+            )
 
         outdir = Path(outdir)
         outdir.mkdir(parents=True, exist_ok=True)

@@ -160,7 +160,10 @@ class DataFrameLookupRepresentation(BaseRepresentation):
             "n_features": int(self._features.shape[1]),
         }
 
-def _canonicalize_keys(values, *, dtype: str = "str", strip: bool = True, lower: bool = False):
+
+def _canonicalize_keys(
+    values, *, dtype: str = "str", strip: bool = True, lower: bool = False
+):
     """
     Return a pd.Index of canonical keys safe for reindexing.
     """

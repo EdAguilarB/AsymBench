@@ -6,16 +6,12 @@ from typing import Dict, Iterable, List, Tuple
 
 import pandas as pd
 
-
 # XGBoost hard restrictions (per your error)
 _XGB_FORBIDDEN = r"[\[\]<>]"
 
 
 def sanitize_feature_name(
-    name: str,
-    *,
-    replace_with: str = "_",
-    max_len: int | None = 200,
+    name: str, *, replace_with: str = "_", max_len: int | None = 200
 ) -> str:
     """
     Sanitize a single feature name to be safe for XGBoost / SHAP TreeExplainer.
@@ -134,7 +130,9 @@ class FeatureNameSanitizer:
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         if not self.fitted_:
-            raise RuntimeError("FeatureNameSanitizer.transform called before fit().")
+            raise RuntimeError(
+                "FeatureNameSanitizer.transform called before fit()."
+            )
         if not isinstance(X, pd.DataFrame):
             raise TypeError("FeatureNameSanitizer expects a pandas.DataFrame")
 
