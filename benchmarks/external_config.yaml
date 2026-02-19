@@ -1,0 +1,160 @@
+dataset:
+  path: data/DAAA.csv
+  smiles_columns: [substrate_smiles, ligand_smiles, solvent_smiles]
+  target: ddG
+  id_col: Example
+
+external_test_set:
+  path: data/test_DAAA.csv
+  smiles_columns: [substrate_smiles, ligand_smiles, solvent_smiles]
+  target: ddG
+  id_col: Example
+
+representations:
+  - type: circus
+    params:
+      radius: 2
+  - type: morgan
+    params:
+      radius: 2
+      n_bits: 2048
+  - type: rdkit
+  - type: bespoke
+    params:
+      features_path: data/features_simple.csv
+      feature_name: v1
+      index_col: Example
+      feature_columns: ['A(stout)', 'A(Hammett)',
+             'B(volume)', 'B(Hammett)', 'C(volume)', 'C(Hammett)', 'D(volume)', 'D(Hammett)',
+             'LF(volume)', 'LB(volume)', 'RF(volume)', 'RB(volume)', 'ANDEN', 'dielectric constant']
+      prefix: Bespoke
+      strict: true
+  - type: bespoke
+    params:
+      features_path: data/features_simple.csv
+      feature_name: v2
+      index_col: Example
+      feature_columns: ['A(stout)', 'A(Hammett sum)',
+             'B(volume)', 'B(Hammett)', 'C(volume)', 'C(Hammett)', 'D(volume)', 'D(Hammett)',
+             'LF(volume)', 'LB(volume)', 'RF(volume)', 'RB(volume)', 'ANDEN', 'dielectric constant']
+      prefix: Bespoke
+      strict: true
+  - type: bespoke
+    params:
+      features_path: data/features_simple.csv
+      feature_name: v3
+      index_col: Example
+      feature_columns: ['A(stout)', 'A(Hammett avg.)',
+             'B(volume)', 'B(Hammett)', 'C(volume)', 'C(Hammett)', 'D(volume)', 'D(Hammett)',
+             'LF(volume)', 'LB(volume)', 'RF(volume)', 'RB(volume)', 'ANDEN', 'dielectric constant']
+      prefix: Bespoke
+      strict: true
+  - type: bespoke
+    params:
+      features_path: data/features_simple.csv
+      feature_name: v4
+      index_col: Example
+      feature_columns: ['A(stout)', 'A(C-NMR-ipso-shifts)',
+             'B(volume)', 'B(Hammett)', 'C(volume)', 'C(Hammett)', 'D(volume)', 'D(Hammett)',
+             'LF(volume)', 'LB(volume)', 'RF(volume)', 'RB(volume)', 'ANDEN', 'dielectric constant']
+      prefix: Bespoke
+      strict: true
+
+preprocessing:
+  scaling: minmax
+
+  feature_selection:
+    variance_filter:
+      enabled: true
+      threshold: 0.0
+
+    correlation_filter:
+      enabled: true
+      threshold: 0.95
+      method: pearson
+
+target_scaling:
+  scaling: minmax
+
+models:
+  - type: random_forest
+    hpo:
+      enabled: true
+      n_trials: 50
+      cv: 3
+      scoring: rmse
+      search_space:
+        n_estimators: {type: int, low: 100, high: 1200}
+        max_depth: {type: int, low: 3, high: 30}
+        min_samples_leaf: {type: int, low: 1, high: 10}
+  - type: svr
+    hpo:
+      enabled: true
+      n_trials: 50
+      cv: 3
+      scoring: rmse
+      search_space:
+        C: {type: float, low: 1e-2, high: 1e3, log: true}
+        gamma: {type: float, low: 1e-6, high: 1e0, log: true}
+        epsilon: {type: float, low: 1e-3, high: 1.0, log: true}
+  - type: xgb
+    hpo:
+      enabled: true
+      n_trials: 50
+      cv: 3
+      scoring: rmse
+      search_space:
+        n_estimators: {type: int, low: 200, high: 1500}
+        max_depth: {type: int, low: 3, high: 10}
+        learning_rate: {type: float, low: 0.01, high: 0.3, log: true}
+        subsample: {type: float, low: 0.5, high: 1.0}
+        colsample_bytree: {type: float, low: 0.5, high: 1.0}
+        min_child_weight: {type: float, low: 1.0, high: 10.0}
+        reg_alpha: {type: float, low: 1e-8, high: 10.0, log: true}
+        reg_lambda: {type: float, low: 1e-3, high: 10.0, log: true}
+  - type: mlp
+    hpo:
+      enabled: true
+      n_trials: 50
+      cv: 3
+      scoring: rmse
+      search_space:
+        hidden_layer_sizes:
+          type: categorical
+          choices:
+            - [16]
+            - [32]
+            - [64]
+            - [16, 16]
+            - [32, 16]
+            - [32, 32]
+            - [64, 32]
+        activation:
+          type: categorical
+          choices: [relu]
+        alpha:
+          type: float
+          low: 1e-6
+          high: 1e-1
+          log: true
+        learning_rate_init:
+          type: float
+          low: 1e-4
+          high: 1e-2
+          log: true
+        batch_size:
+          type: categorical
+          choices: [32, 64, 128]
+
+splits:
+  - sampler: external
+
+split_by_mol_col: [substrate_smiles]
+
+train_set_sizes: [1]
+
+seeds: [0, 1, 2, 3, 4]
+
+log_dirs:
+  runs: experiments2/external_test_set/runs
+  benchmark: experiments2/external_test_set/benchmark
