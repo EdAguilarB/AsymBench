@@ -4,10 +4,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import shap
-import matplotlib.pyplot as plt
 
 
 def _ensure_df(X, feature_names=None) -> pd.DataFrame:

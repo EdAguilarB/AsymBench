@@ -4,14 +4,14 @@ import pandas as pd
 
 from asymbench.data.splitter import MoleculeSplitter
 from asymbench.evaluation.metrics import evaluate_predictions
+from asymbench.explainability.shap_explainer import ShapExplainer
 from asymbench.optimization.optuna_optimizer import OptunaSklearnOptimizer
 from asymbench.preprocessing.feature_preprocessor import FeaturePreprocessor
 from asymbench.preprocessing.targets_scaler import TargetScaler
 from asymbench.representations.base_featurizer import BaseSmilesFeaturizer
+from asymbench.utils.feature_names import FeatureNameSanitizer
 from asymbench.utils.run_store import RunStore
 from asymbench.visualization.parity import make_parity_plot
-from asymbench.explainability.shap_explainer import ShapExplainer
-from asymbench.utils.feature_names import FeatureNameSanitizer
 
 
 class Experiment:

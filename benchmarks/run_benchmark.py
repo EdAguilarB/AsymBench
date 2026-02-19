@@ -1,6 +1,7 @@
 import argparse
-import yaml
 from pathlib import Path
+
+import yaml
 
 from asymbench.core.benchmark_runner import BenchmarkRunner
 from asymbench.core.result_aggregator import aggregate_results

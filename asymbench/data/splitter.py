@@ -1,9 +1,9 @@
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, List, Optional
 
-import pandas as pd
-import numpy as np
 from astartes.molecules import train_test_split_molecules
+import numpy as np
+import pandas as pd
 
 
 @dataclass
