@@ -108,7 +108,7 @@ class Experiment:
             y_test = self.y_scaling.inverse_transform(y_test)
             preds_test = self.y_scaling.inverse_transform(preds_test)
 
-            results = pd.DataFrame({
+            pd.DataFrame({
                 X_test.index.name: X_test.index,
                 "y": y_test,
                 "y_pred": preds_test
@@ -184,6 +184,9 @@ class Experiment:
         if rep_type in ("df_lookup", "bespoke", "precomputed"):
             feature_name = rep_params.get("feature_name", None)
             rep_type = rep_type + "_" + feature_name
+        if rep_type == "hf_transformer":
+            model_name = rep_params.get("model_type", None)
+            rep_type = rep_type + "_" + model_name
 
         # split sampler + train size
         split_cfg = getattr(self.split_strategy, "config", {})

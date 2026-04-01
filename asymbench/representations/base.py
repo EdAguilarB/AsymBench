@@ -1,5 +1,6 @@
 from asymbench.representations.circus import CircusFeaturizer
 from asymbench.representations.df_lookup import DataFrameLookupRepresentation
+from asymbench.representations.hf_transformer import HFTransformerFeaturizer
 from asymbench.representations.mol_descriptors import RDKitDescriptorFeaturizer
 from asymbench.representations.morgan_fp import MorganFeaturizer
 
@@ -18,5 +19,8 @@ def get_representation(config):
 
     if rep_type in ("df_lookup", "bespoke", "precomputed"):
         return DataFrameLookupRepresentation(config)
+
+    if rep_type == "hf_transformer":
+        return HFTransformerFeaturizer(config)
 
     raise ValueError(f"Unknown representation: {rep_type}")
