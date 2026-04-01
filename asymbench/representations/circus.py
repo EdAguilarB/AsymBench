@@ -3,9 +3,7 @@ import json
 from doptools import ChythonCircus
 import pandas as pd
 
-from asymbench.representations.base_featurizer import (
-    BaseCorpusSmilesFeaturizer,
-)
+from asymbench.representations.base import BaseCorpusSmilesFeaturizer
 
 
 class CircusFeaturizer(BaseCorpusSmilesFeaturizer):

@@ -1,7 +1,7 @@
 import numpy as np
 from rdkit.Chem import Descriptors
 
-from asymbench.representations.base_featurizer import BaseSmilesFeaturizer
+from asymbench.representations.base import BaseSmilesFeaturizer
 
 
 class RDKitDescriptorFeaturizer(BaseSmilesFeaturizer):
