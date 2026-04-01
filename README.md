@@ -106,8 +106,16 @@ conda activate asymbench
 
 ### 3. Install dependencies
 
+First install poetry to manage the dependencies.
+
 ```bash
-pip install -r requirements.txt
+pip install poetry
+```
+
+After that, install the dependencies into the new environment:
+
+```bash
+poetry install
 ```
 
 ---

@@ -87,6 +87,30 @@ typing_extensions = {version = ">=4.5", markers = "python_version < \"3.13\""}
 trio = ["trio (>=0.32.0)"]
 
 [[package]]
+name = "astartes"
+version = "1.3.3"
+description = "Train:Test Algorithmic Sampling for Molecules and Arbitrary Arrays"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "astartes-1.3.3-py3-none-any.whl", hash = "sha256:362447c5ceb77567dd9ea9c5a780d86fe36ba47b27184ba565ba2959a846c672"},
+    {file = "astartes-1.3.3.tar.gz", hash = "sha256:fedaa54e705ef0d100adb59067db196d440a42e7a30787caca1b53cf33beda5b"},
+]
+
+[package.dependencies]
+numpy = "*"
+pandas = "*"
+scikit_learn = "*"
+scipy = "*"
+tabulate = "*"
+
+[package.extras]
+demos = ["kaleido", "plotly", "py2opsin", "tabulate"]
+dev = ["black", "isort", "pytest"]
+molecules = ["aimsim_core"]
+
+[[package]]
 name = "asttokens"
 version = "3.0.1"
 description = "Annotate AST trees with source code positions"
@@ -3786,6 +3810,21 @@ mpmath = ">=1.1.0,<1.4"
 dev = ["hypothesis (>=6.70.0)", "pytest (>=7.1.0)"]
 
 [[package]]
+name = "tabulate"
+version = "0.10.0"
+description = "Pretty-print tabular data"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "tabulate-0.10.0-py3-none-any.whl", hash = "sha256:f0b0622e567335c8fabaaa659f1b33bcb6ddfe2e496071b743aa113f8774f2d3"},
+    {file = "tabulate-0.10.0.tar.gz", hash = "sha256:e2cfde8f79420f6deeffdeda9aaec3b6bc5abce947655d17ac662b126e48a60d"},
+]
+
+[package.extras]
+widechars = ["wcwidth"]
+
+[[package]]
 name = "tensorboard"
 version = "2.20.0"
 description = "TensorBoard lets you watch Tensors Flow"
@@ -4316,4 +4355,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11"
-content-hash = "d5660c9b56072d6a0702df5dc431cf59aff2c6782e6b04e1837baba2c6100f7d"
+content-hash = "afc717a8a4bdb17269c89967b06f1d5241f3741a411a1c0e2fd048593ac9b3f4"
