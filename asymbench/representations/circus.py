@@ -1,3 +1,5 @@
+import json
+
 from doptools import ChythonCircus
 import pandas as pd
 
@@ -60,3 +62,46 @@ class CircusFeaturizer(BaseCorpusSmilesFeaturizer):
             X = X.reindex(columns=self._feature_names, fill_value=0.0)
 
         return X
+
+
+class CachingCircusRepresentation:
+    """
+    Wraps CircusFeaturizer with a shared fit-cache keyed by training-set identity.
+
+    When multiple experiments share the same training split (same split strategy,
+    train size, and seed) but differ only in the downstream model, ``fit()`` is
+    executed only once; subsequent calls restore the fitted state from the cache.
+
+    The cache dict is owned by ``BenchmarkRunner`` and shared across all
+    instances that belong to the same benchmark run.
+    """
+
+    def __init__(self, config: dict, fit_cache: dict) -> None:
+        self._inner = CircusFeaturizer(config)
+        self._fit_cache = fit_cache
+        self._cache_key_str = json.dumps(config["representation"], sort_keys=True)
+        # Expose attributes read by Experiment._run_signature()
+        self.rep_type = self._inner.rep_type
+        self.rep_params = self._inner.rep_params
+
+    def fit(self, df_train: pd.DataFrame) -> "CachingCircusRepresentation":
+        cache_key = (tuple(sorted(df_train.index.tolist())), self._cache_key_str)
+
+        if cache_key in self._fit_cache:
+            cached = self._fit_cache[cache_key]
+            # Restore fitted state from the cached instance.
+            # The generators were fit-once and are not mutated after caching.
+            self._inner._generators = cached._generators
+            self._inner._is_fitted = True
+            self._inner._feature_names = cached._feature_names
+        else:
+            self._inner.fit(df_train)
+            # Store the fitted inner instance; it will not be re-fit after this.
+            self._fit_cache[cache_key] = self._inner
+        return self
+
+    def transform(self, df: pd.DataFrame) -> pd.DataFrame:
+        return self._inner.transform(df)
+
+    def get_metadata(self) -> dict:
+        return self._inner.get_metadata()
