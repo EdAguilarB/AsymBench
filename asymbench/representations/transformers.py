@@ -7,7 +7,7 @@ import numpy as np
 from rdkit import Chem
 import torch
 
-from asymbench.representations.base_featurizer import BaseSmilesFeaturizer
+from asymbench.representations.base import BaseSmilesFeaturizer
 
 
 @dataclass
