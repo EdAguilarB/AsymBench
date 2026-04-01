@@ -32,10 +32,16 @@ class UniMolFeaturizer(BaseSmilesFeaturizer):
     def __post_init__(self) -> None:
         super().__post_init__()
 
-        self.data_type: str = str(self.rep_params.get("data_type", "molecule")).strip().lower()
+        self.data_type: str = (
+            str(self.rep_params.get("data_type", "molecule")).strip().lower()
+        )
         self.remove_hs: bool = bool(self.rep_params.get("remove_hs", False))
-        self.model_name: str = str(self.rep_params.get("model_name", "unimolv1")).strip().lower()
-        self.model_size: str = str(self.rep_params.get("model_size", "84m")).strip().lower()
+        self.model_name: str = (
+            str(self.rep_params.get("model_name", "unimolv1")).strip().lower()
+        )
+        self.model_size: str = (
+            str(self.rep_params.get("model_size", "84m")).strip().lower()
+        )
 
         self._clf = UniMolRepr(
             data_type=self.data_type,
@@ -63,7 +69,10 @@ class UniMolFeaturizer(BaseSmilesFeaturizer):
 
     def feature_names_per_mol(self) -> List[str]:
         width = len(str(self._feature_dim - 1))
-        return [f"unimol_{self.model_name}_emb_{i:0{width}d}" for i in range(self._feature_dim)]
+        return [
+            f"unimol_{self.model_name}_emb_{i:0{width}d}"
+            for i in range(self._feature_dim)
+        ]
 
     # ------------------------------------------------------------------ #
     #  Batch transform — one get_repr call per column, not per molecule    #
@@ -74,7 +83,9 @@ class UniMolFeaturizer(BaseSmilesFeaturizer):
         out_blocks = []
 
         for col in self.smiles_cols:
-            result = self._clf.get_repr(df[col].tolist(), return_atomic_reprs=False)
+            result = self._clf.get_repr(
+                df[col].tolist(), return_atomic_reprs=False
+            )
             out_blocks.append(np.stack(result, axis=0))
 
         out = np.concatenate(out_blocks, axis=1)

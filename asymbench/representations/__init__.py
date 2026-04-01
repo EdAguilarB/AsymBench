@@ -1,11 +1,7 @@
-from asymbench.representations.circus import (
-    CircusFeaturizer,
-)
+from asymbench.representations.circus import CircusFeaturizer
 from asymbench.representations.descriptors import RDKitDescriptorFeaturizer
 from asymbench.representations.fingerprints import MorganFeaturizer
-from asymbench.representations.lookup import (
-    DataFrameLookupRepresentation,
-)
+from asymbench.representations.lookup import DataFrameLookupRepresentation
 from asymbench.representations.transformers import HFTransformerFeaturizer
 from asymbench.representations.unimol import UniMolFeaturizer
 
