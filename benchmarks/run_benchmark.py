@@ -1,3 +1,14 @@
+import os
+
+# Must be set before any OpenMP-linked library (numpy, torch, unimol_tools) is
+# imported.  On macOS, PyTorch's libomp and Intel MKL's libiomp5 are both
+# pulled in by the dependency stack; without this flag the second library to
+# initialise triggers a segfault during model-weight loading.
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
 import argparse
 from pathlib import Path
 
