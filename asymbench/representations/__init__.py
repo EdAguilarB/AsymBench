@@ -7,6 +7,7 @@ from asymbench.representations.lookup import (
     DataFrameLookupRepresentation,
 )
 from asymbench.representations.transformers import HFTransformerFeaturizer
+from asymbench.representations.unimol import UniMolFeaturizer
 
 
 def get_representation(config):
@@ -26,5 +27,8 @@ def get_representation(config):
 
     if rep_type == "hf_transformer":
         return HFTransformerFeaturizer(config)
+
+    if rep_type == "unimol":
+        return UniMolFeaturizer(config)
 
     raise ValueError(f"Unknown representation: {rep_type}")
