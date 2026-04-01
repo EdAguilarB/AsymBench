@@ -64,10 +64,12 @@ class Experiment:
             X_train, X_test = self._compute_representations(df_train, df_test)
             X_train, X_test, y_train, y_test = self._preprocess(X_train, X_test, y_train, y_test)
             best_model, best_params, best_cv_score, hpo_meta = self._run_hpo(X_train, y_train)
-            preds_test = self._train_and_predict(best_model, X_train, y_train, X_test)
+            preds_train, preds_test = self._train_and_predict(best_model, X_train, y_train, X_test)
             self._explain(best_model, X_train, X_test, run_dir)
-            y_test, preds_test = self._inverse_transform(y_test, preds_test)
-            self._save_predictions(X_test, y_test, preds_test, run_dir)
+            y_train, preds_train, y_test, preds_test = self._inverse_transform(
+                y_train, preds_train, y_test, preds_test
+            )
+            self._save_predictions(X_train, y_train, preds_train, X_test, y_test, preds_test, run_dir)
             metrics = self._build_metrics(
                 y_test, preds_test, X_train, model_type,
                 best_params, best_cv_score, hpo_meta,
@@ -115,7 +117,7 @@ class Experiment:
 
     def _train_and_predict(self, best_model, X_train, y_train, X_test):
         best_model.fit(X_train, y_train)
-        return best_model.predict(X_test)
+        return best_model.predict(X_train), best_model.predict(X_test)
 
     def _explain(self, best_model, X_train, X_test, run_dir: Path):
         expl_dir = run_dir / "explainability"
@@ -125,19 +127,30 @@ class Experiment:
         shapx.explain(X_train, outdir=expl_dir, prefix="train")
         shapx.explain(X_test, outdir=expl_dir, prefix="test")
 
-    def _inverse_transform(self, y_test, preds_test):
+    def _inverse_transform(self, y_train, preds_train, y_test, preds_test):
+        y_train = self.y_scaling.inverse_transform(y_train)
+        preds_train = self.y_scaling.inverse_transform(preds_train)
         y_test = self.y_scaling.inverse_transform(y_test)
         preds_test = self.y_scaling.inverse_transform(preds_test)
-        return y_test, preds_test
+        return y_train, preds_train, y_test, preds_test
 
-    def _save_predictions(self, X_test, y_test, preds_test, run_dir: Path):
-        pd.DataFrame(
-            {
-                X_test.index.name: X_test.index,
-                "y": y_test,
-                "y_pred": preds_test,
-            }
-        ).to_csv(run_dir / "preds.csv", index=False)
+    def _save_predictions(
+        self,
+        X_train, y_train, preds_train,
+        X_test, y_test, preds_test,
+        run_dir: Path,
+    ):
+        train_df = X_train.copy()
+        train_df.insert(0, "split", "train")
+        train_df.insert(1, self.target, y_train)
+        train_df.insert(2, f"{self.target}_pred", preds_train)
+
+        test_df = X_test.copy()
+        test_df.insert(0, "split", "test")
+        test_df.insert(1, self.target, y_test)
+        test_df.insert(2, f"{self.target}_pred", preds_test)
+
+        pd.concat([train_df, test_df]).to_csv(run_dir / "predictions.csv", index=True)
 
     def _build_metrics(
         self, y_test, preds_test, X_train, model_type, best_params, best_cv_score, hpo_meta
