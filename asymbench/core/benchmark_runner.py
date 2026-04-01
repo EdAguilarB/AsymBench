@@ -10,9 +10,9 @@ from asymbench.data.splitter import MoleculeSplitter
 from asymbench.optimization.base import get_optimizer
 from asymbench.preprocessing.feature_preprocessor import FeaturePreprocessor
 from asymbench.preprocessing.targets_scaler import TargetScaler
-from asymbench.representations.base import get_representation
+from asymbench.representations import get_representation
 from asymbench.representations.circus import CachingCircusRepresentation
-from asymbench.representations.precomputed import PrecomputedRepresentation
+from asymbench.representations.lookup import PrecomputedRepresentation
 
 
 class BenchmarkRunner:
