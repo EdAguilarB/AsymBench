@@ -19,8 +19,8 @@
 
 It is designed for **research-grade experiments**, enabling systematic comparison of:
 
-- Molecular representations (fingerprints, descriptors, bespoke features)
-- Machine learning models (RF, SVR, XGBoost, MLP, GNNs)
+- Molecular representations (fingerprints, descriptors, deep learning embeddings, bespoke features)
+- Machine learning models (RF, SVR, XGBoost, MLP)
 - Data splitting strategies
 - Training set sizes
 - Random seeds
@@ -34,6 +34,7 @@ The framework automatically performs:
 - Hyperparameter optimization
 - Model training
 - Evaluation
+- SHAP explainability
 - Statistical analysis
 - Plot generation
 - Reproducible run caching
@@ -45,22 +46,23 @@ The framework automatically performs:
 ### Reproducible Benchmarking
 - Fully configuration-driven experiments via YAML
 - Deterministic splits using seeds
-- Automatic caching of completed runs
+- Automatic caching of completed runs (keyed by representation, model, split strategy, and seed)
 - Resume interrupted experiments
 
 ### Multiple Molecular Representations
-- Morgan fingerprints
-- RDKit descriptors
-- Circus descriptors
-- Precomputed/bespoke features from dataframes
-- Easily extensible representation interface
+- **Morgan fingerprints** (`morgan`)
+- **RDKit descriptors** (`rdkit`)
+- **CIRCuS descriptors** (`circus`) — corpus-fit, training-set-aware
+- **HuggingFace transformer embeddings** (`hf_transformer`) — ChemBERTa, MolT5
+- **UniMol embeddings** (`unimol`) — UniMolv1 / UniMolv2
+- **Precomputed / bespoke features** (`df_lookup`, `bespoke`, `precomputed`) — loaded from CSV or Parquet by index
+- Easily extensible via `BaseSmilesFeaturizer` or `BaseRepresentation`
 
 ### Multiple Machine Learning Models
-- Random Forest
-- Support Vector Regression
-- XGBoost
-- MLPRegressor
-- Graph Neural Networks (optional)
+- Random Forest (`random_forest`)
+- Support Vector Regression (`svr`)
+- XGBoost (`xgb`)
+- MLP Regressor (`mlp`)
 
 ### Automated Hyperparameter Optimization
 - Optuna-based optimization
@@ -69,14 +71,17 @@ The framework automatically performs:
 - Fully configurable from YAML
 
 ### Advanced Data Splitting
+- Powered by [astartes](https://github.com/JacksonBurns/astartes)
 - Random split
 - Scaffold split
 - Target-property-based split
 - Train size sweeps
 - Multi-seed evaluation
+- External test set support
 
 ### Built-in Analysis Tools
-- Parity plots
+- Parity plots (train and test)
+- SHAP feature importance (train and test)
 - Distribution plots
 - Statistical tests:
   - Friedman test
@@ -99,7 +104,7 @@ conda create -n asymbench python=3.11
 conda activate asymbench
 ```
 
-### 2. Install dependencies
+### 3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -147,19 +152,19 @@ models:
 ### 3. Run the benchmark
 
 ``` bash
-python -m benchmarks/run_benchmark.py --config path/to/yaml/config.yaml
+python -m benchmarks.run_benchmark --config path/to/config.yaml
 ```
 
 ---
+
 ## Run Caching and Reproducibility
 Each experiment is uniquely identified by:
-- Dataset
-- Representation
-- Model
-- Split strategy
-- Train size
+- Representation (type + params)
+- Model (type)
+- Split strategy (sampler, train size, split column)
 - Seed
-If a run already exists, it is loaded instead of recomputed.
+
+If a run with the same signature already exists and completed successfully, it is loaded from cache instead of recomputed.
 
 This enables:
 - Interrupted experiment recovery
@@ -168,45 +173,63 @@ This enables:
 
 ---
 
+## Output Files
+
+Each completed run writes the following to its run directory:
+
+| File | Contents |
+|---|---|
+| `predictions.csv` | Train and test rows with `split`, target, predicted target, and all descriptor columns |
+| `parity_test.png` | Parity plot for the test set |
+| `explainability/train_*.csv` | SHAP values for the training set |
+| `explainability/test_*.csv` | SHAP values for the test set |
+| `metrics.json` | Evaluation metrics and run metadata |
+
+---
+
 ## Adding New Representations
-Create a new class inheriting from:
 
-``` python
-BaseSmilesFeaturizer
+Create a new class inheriting from `BaseSmilesFeaturizer` (for SMILES-based per-molecule featurizers) or `BaseRepresentation` (for any other input format):
+
+```python
+# asymbench/representations/my_rep.py
+from asymbench.representations.base import BaseSmilesFeaturizer
+
+class MyFeaturizer(BaseSmilesFeaturizer):
+    @property
+    def feature_dim_per_mol(self) -> int: ...
+    def featurize_mol(self, mol) -> np.ndarray: ...
+    def feature_names_per_mol(self) -> list[str]: ...
 ```
 
-or
+Then register it in `asymbench/representations/__init__.py`:
 
-``` python
-BaseRepresentation
-```
+```python
+from asymbench.representations.my_rep import MyFeaturizer
 
-Then register in
-
-``` python
-asymbench/representations/base.py
+def get_representation(config):
+    ...
+    if rep_type == "my_rep":
+        return MyFeaturizer(config)
 ```
 
 ## Adding New Models
-Add your model in:
 
-``` python
-asymbench/models/base.py
-```
+Add a branch in `asymbench/models/base.py`:
 
-Example:
-
-``` python
+```python
 elif model_type == "my_model":
+    _set_if_missing(params, "random_state", seed)
     return MyModel(**params)
 ```
 
 ---
+
 ## Citation
 Coming soon :)
 
 ## License
-MIT License
+MIT
 
 ## Contact
 Eduardo Aguilar: ed.aguilar.bejarano@gmail.com
