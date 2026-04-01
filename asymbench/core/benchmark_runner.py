@@ -62,7 +62,10 @@ class BenchmarkRunner:
             if key in self._precomputed:
                 continue  # already computed (e.g. duplicate config entries)
 
-            rep_config = {"representation": rep_cfg, "data": self.config["dataset"]}
+            rep_config = {
+                "representation": rep_cfg,
+                "data": self.config["dataset"],
+            }
             rep = get_representation(rep_config)
 
             if hasattr(rep, "fit"):
@@ -140,15 +143,13 @@ class BenchmarkRunner:
         if key in self._precomputed:
             # Fit-free: wrap pre-computed features — no molecular computation at run time.
             representation = PrecomputedRepresentation(
-                config=rep_config,
-                _features=self._precomputed[key],
+                config=rep_config, _features=self._precomputed[key]
             )
         else:
             # Trainable (e.g. CircusFeaturizer): inject the shared fit-cache so
             # the same training set is never fit() more than once.
             representation = CachingCircusRepresentation(
-                config=rep_config,
-                fit_cache=self._circus_fit_cache,
+                config=rep_config, fit_cache=self._circus_fit_cache
             )
 
         preprocessing = FeaturePreprocessor(pre_cfg)

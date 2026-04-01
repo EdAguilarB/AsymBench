@@ -79,13 +79,18 @@ class CachingCircusRepresentation:
     def __init__(self, config: dict, fit_cache: dict) -> None:
         self._inner = CircusFeaturizer(config)
         self._fit_cache = fit_cache
-        self._cache_key_str = json.dumps(config["representation"], sort_keys=True)
+        self._cache_key_str = json.dumps(
+            config["representation"], sort_keys=True
+        )
         # Expose attributes read by Experiment._run_signature()
         self.rep_type = self._inner.rep_type
         self.rep_params = self._inner.rep_params
 
     def fit(self, df_train: pd.DataFrame) -> "CachingCircusRepresentation":
-        cache_key = (tuple(sorted(df_train.index.tolist())), self._cache_key_str)
+        cache_key = (
+            tuple(sorted(df_train.index.tolist())),
+            self._cache_key_str,
+        )
 
         if cache_key in self._fit_cache:
             cached = self._fit_cache[cache_key]

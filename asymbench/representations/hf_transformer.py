@@ -4,8 +4,8 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-import torch
 from rdkit import Chem
+import torch
 
 from asymbench.representations.base_featurizer import BaseSmilesFeaturizer
 
@@ -32,24 +32,34 @@ class HFTransformerFeaturizer(BaseSmilesFeaturizer):
     def __post_init__(self) -> None:
         super().__post_init__()
 
-        self.model_type: str = str(self.rep_params.get("model_type", "chemberta")).strip().lower()
+        self.model_type: str = (
+            str(self.rep_params.get("model_type", "chemberta")).strip().lower()
+        )
         if self.model_type not in {"chemberta", "molt5"}:
-            raise ValueError("model_type must be one of {'chemberta', 'molt5'}")
+            raise ValueError(
+                "model_type must be one of {'chemberta', 'molt5'}"
+            )
 
         _defaults = {
             "chemberta": "DeepChem/ChemBERTa-77M-MLM",
             "molt5": "laituan245/molt5-base",
         }
-        self.model_name: str = str(self.rep_params.get("model_name", _defaults[self.model_type]))
+        self.model_name: str = str(
+            self.rep_params.get("model_name", _defaults[self.model_type])
+        )
 
-        self.pooling: str = str(self.rep_params.get("pooling", "mean")).strip().lower()
+        self.pooling: str = (
+            str(self.rep_params.get("pooling", "mean")).strip().lower()
+        )
         if self.pooling not in {"mean", "cls"}:
             raise ValueError("pooling must be one of {'mean', 'cls'}")
 
         self.max_length: int = int(self.rep_params.get("max_length", 512))
 
         # Device is resolved lazily so no CUDA context is created in the parent process
-        self._requested_device: Optional[str] = self.rep_params.get("device", None)
+        self._requested_device: Optional[str] = self.rep_params.get(
+            "device", None
+        )
 
         # Model and tokenizer are loaded lazily (fork-safe)
         self._tokenizer = None
@@ -64,17 +74,21 @@ class HFTransformerFeaturizer(BaseSmilesFeaturizer):
         if self._model is not None:
             return
 
-        device = self._requested_device or ("cuda" if torch.cuda.is_available() else "cpu")
+        device = self._requested_device or (
+            "cuda" if torch.cuda.is_available() else "cpu"
+        )
         self._device = device
 
         if self.model_type == "chemberta":
             from transformers import AutoModel, AutoTokenizer
+
             self._tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             self._model = AutoModel.from_pretrained(self.model_name)
             self._feature_dim = int(self._model.config.hidden_size)
 
         elif self.model_type == "molt5":
             from transformers import AutoTokenizer, T5EncoderModel
+
             self._tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             self._model = T5EncoderModel.from_pretrained(self.model_name)
             self._feature_dim = int(self._model.config.d_model)
@@ -139,8 +153,14 @@ class HFTransformerFeaturizer(BaseSmilesFeaturizer):
     # ------------------------------------------------------------------ #
 
     @staticmethod
-    def _mean_pool(last_hidden_state: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
-        mask = attention_mask.unsqueeze(-1).expand(last_hidden_state.size()).float()
+    def _mean_pool(
+        last_hidden_state: torch.Tensor, attention_mask: torch.Tensor
+    ) -> torch.Tensor:
+        mask = (
+            attention_mask.unsqueeze(-1)
+            .expand(last_hidden_state.size())
+            .float()
+        )
         summed = torch.sum(last_hidden_state * mask, dim=1)
         counts = torch.clamp(mask.sum(dim=1), min=1e-9)
         return summed / counts

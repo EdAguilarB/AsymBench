@@ -1,8 +1,8 @@
 from asymbench.representations.circus import CircusFeaturizer
 from asymbench.representations.df_lookup import DataFrameLookupRepresentation
+from asymbench.representations.hf_transformer import HFTransformerFeaturizer
 from asymbench.representations.mol_descriptors import RDKitDescriptorFeaturizer
 from asymbench.representations.morgan_fp import MorganFeaturizer
-from asymbench.representations.hf_transformer import HFTransformerFeaturizer
 
 
 def get_representation(config):
