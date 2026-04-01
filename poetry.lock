@@ -226,21 +226,21 @@ files = [
 
 [[package]]
 name = "chython"
-version = "2.15.1"
+version = "2.16"
 description = "Library for processing molecules and reactions in python way"
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "chython-2.15.1-cp310-cp310-macosx_15_0_arm64.whl", hash = "sha256:e0deb9bab989fece9bc66f36d37954cbbd01e3048ba175563b483b300402d226"},
-    {file = "chython-2.15.1-cp310-cp310-manylinux_2_35_x86_64.whl", hash = "sha256:60ea8a90b6435b6919cfe9a489fe986e342873204cacf613bd0d2a41d9fb3031"},
-    {file = "chython-2.15.1-cp310-cp310-win_amd64.whl", hash = "sha256:a9e001fa4500ee10dec718a2e53e94a347d86c6a6b7096e0317dbafb25bdc925"},
-    {file = "chython-2.15.1-cp311-cp311-macosx_15_0_arm64.whl", hash = "sha256:ba5350431d7aa5409a3fd4769eeed091d79d02134c1e29a2c65925d4cb8fb4bb"},
-    {file = "chython-2.15.1-cp311-cp311-manylinux_2_35_x86_64.whl", hash = "sha256:d318a0d8017415ab89ee6a6afacf4a769a3d3b6de7d7af7a5b9d33ec40a28586"},
-    {file = "chython-2.15.1-cp311-cp311-win_amd64.whl", hash = "sha256:4cbd1ec499d9e2f72e7c054b5d7abfc758fe0a5e2a9f151087317075284811d2"},
-    {file = "chython-2.15.1-cp312-cp312-macosx_15_0_arm64.whl", hash = "sha256:e3ece02aff9d5c45ef453e66e8d4a27ba463fc1137b4311749ea31f5c68cf365"},
-    {file = "chython-2.15.1-cp312-cp312-manylinux_2_35_x86_64.whl", hash = "sha256:7260f86605159ef9c3b9d22a1e33e9a1fa503614d1178c64b5abcc26d37609f9"},
-    {file = "chython-2.15.1-cp312-cp312-win_amd64.whl", hash = "sha256:297f2bf01af9f25bb9605233b1e0eef82cdb37fb99745cf8be1ca8496b40e2e3"},
+    {file = "chython-2.16-cp310-cp310-macosx_15_0_arm64.whl", hash = "sha256:25c8576e933256d6fb496ee63c99a72206aaeec8fd68fb74f701b8fbb899a66d"},
+    {file = "chython-2.16-cp310-cp310-manylinux_2_35_x86_64.whl", hash = "sha256:6c6e4c1ef85c65407b32e4728cc75fa3e9cad93886ce7556598afe929cfbaf2f"},
+    {file = "chython-2.16-cp310-cp310-win_amd64.whl", hash = "sha256:9cc20a5be4aefa360319669e7ffd81dd412769ac6214dcebfa03dc4f5ffc339b"},
+    {file = "chython-2.16-cp311-cp311-macosx_15_0_arm64.whl", hash = "sha256:602b53077c0cff9aa5ac443960c2efa609dadb6491ef3c0d93a5f6fc124c7461"},
+    {file = "chython-2.16-cp311-cp311-manylinux_2_35_x86_64.whl", hash = "sha256:2047c6ca5e5025b61cf5ae2038ea2d7937034c52fe987756e8c375aa0c178e45"},
+    {file = "chython-2.16-cp311-cp311-win_amd64.whl", hash = "sha256:368a93d8c601ea7abff1007ee9ba6321086954e347ce72e1cacaf79d520b5c89"},
+    {file = "chython-2.16-cp312-cp312-macosx_15_0_arm64.whl", hash = "sha256:95007fac10eb9403dcb005baa0dcfec3379d65f131c884589946a834a0d97996"},
+    {file = "chython-2.16-cp312-cp312-manylinux_2_35_x86_64.whl", hash = "sha256:f079248c5d2a5bf9ba197c33b2ec412413709c18647b5362e677f8fd4e84b437"},
+    {file = "chython-2.16-cp312-cp312-win_amd64.whl", hash = "sha256:8a90037b0f8c72d4e6145170ee591ee18e85742a0275b2e8e550e1df62c3cc1e"},
 ]
 
 [package.dependencies]
@@ -4508,4 +4508,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11"
-content-hash = "2628791bb7ad40102eb41b7d8c8ac549cb60fbf2a098738312db5d7bf083ff5e"
+content-hash = "b59b49d25aa0d0dd6215596b3443f2fc3f96cb9be4c0c019019ea7e447579b03"
