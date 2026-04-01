@@ -24,7 +24,7 @@ dependencies = [
     "doptools (>=1.3.9,<2.0.0)",
     "transformers (>=5.4.0,<6.0.0)",
     "unimol-tools (>=0.1.5,<0.2.0)",
-    "astartes (>=1.3.3,<2.0.0)"
+    "astartes[molecules] (>=1.3.3,<2.0.0)"
 ]
 
 
