@@ -76,6 +76,7 @@ class GNNExperiment:
         seed: int,
         cache_dir: Path = Path("experiment_runs"),
         external_test_set: pd.DataFrame | None = None,
+        explainability_cfg: dict | None = None,
     ) -> None:
         self.dataset = dataset
         self.smiles_columns = smiles_columns
@@ -90,6 +91,7 @@ class GNNExperiment:
         self.cache_dir = Path(cache_dir)
         self.run_store = RunStore(base_dir=self.cache_dir)
         self.external_test_set = external_test_set
+        self.explainability_cfg: dict = explainability_cfg or {}
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # ------------------------------------------------------------------
@@ -119,6 +121,9 @@ class GNNExperiment:
 
             model = self._build_model()
             self._train(model, train_loader)
+
+            if self.explainability_cfg.get("enabled", False):
+                self._explain(model, train_loader, test_loader, run_dir)
 
             preds_train = self.y_scaling.inverse_transform(
                 predict(model, train_loader, self.device)
@@ -186,6 +191,39 @@ class GNNExperiment:
             loss = train_epoch(model, loader, optimizer, self.device)
             if (epoch + 1) % 10 == 0:
                 print(f"  epoch {epoch + 1:>4}/{epochs}  loss={loss:.4f}")
+
+    def _explain(
+        self,
+        model: ReactionGCN,
+        train_loader: DataLoader,
+        test_loader: DataLoader,
+        run_dir: Path,
+    ) -> None:
+        """Run CaptumExplainer and save node masks + fragment importances."""
+        from asymbench.explainability.gnn_explainer import (
+            GNNExplainer,
+            get_fragment_importance,
+        )
+
+        expl_cfg = self.explainability_cfg
+        explainer = GNNExplainer(
+            model=model,
+            attribution_method=expl_cfg.get(
+                "attribution_method", "ShapleyValueSampling"
+            ),
+            fragmentation=expl_cfg.get("fragmentation", "brics"),
+        ).fit()
+
+        for prefix, loader in [("train", train_loader), ("test", test_loader)]:
+            outdir = run_dir / "explainability" / prefix
+            dataset = loader.dataset
+            node_masks = explainer.explain_dataset(dataset, self.device)
+            frag_importances = get_fragment_importance(
+                dataset._data,
+                node_masks,
+                explainer.fragmentation,
+            )
+            explainer.save(node_masks, frag_importances, outdir)
 
     # ------------------------------------------------------------------
     # Reporting helpers
