@@ -135,7 +135,11 @@ class ReactionGraphBuilder:
                 return None
             mol_graphs.append(g)
 
-        return merge_molecular_graphs(mol_graphs)
+        graph = merge_molecular_graphs(mol_graphs)
+        # Store per-molecule SMILES (ordered) so explainability can map
+        # per-atom scores back to molecular fragments.
+        graph.mol_smiles = [(col, str(row[col])) for col in self.smiles_cols]
+        return graph
 
     def build_dataset(
         self,
