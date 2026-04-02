@@ -93,7 +93,7 @@ The framework automatically performs:
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/asymbench.git
+git clone https://github.com/EdAguilarB/asymbench.git
 cd asymbench
 ```
 
