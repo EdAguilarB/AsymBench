@@ -95,6 +95,7 @@ class BenchmarkRunner:
         )
         pre_cfg = self.config["preprocessing"]
         y_scl_cfg = self.config["target_scaling"]
+        expl_cfg = self.config.get("explainability", {"enabled": False})
 
         for (
             rep_cfg,
@@ -121,6 +122,7 @@ class BenchmarkRunner:
                 split_cfg=split_cfg,
                 split_by_mol_col=split_by_mol_col,
                 seed=seed,
+                expl_cfg=expl_cfg,
             )
             metrics = exp.run()
 
@@ -146,12 +148,15 @@ class BenchmarkRunner:
         split_cfg,
         split_by_mol_col,
         seed,
+        expl_cfg=None,
     ):
         rep_config = {
             "representation": rep_cfg,
             "data": self.config["dataset"],
         }
         split_strategy = MoleculeSplitter(split_cfg)
+
+        expl_cfg = expl_cfg or {"enabled": False}
 
         # --- GNN path ---
         if rep_cfg.get("type") == "graph":
@@ -168,6 +173,7 @@ class BenchmarkRunner:
                 seed=seed,
                 cache_dir=self.config["log_dirs"]["runs"],
                 external_test_set=self.external_test,
+                explainability_cfg=expl_cfg,
             )
 
         # --- sklearn path ---
@@ -201,6 +207,7 @@ class BenchmarkRunner:
             seed=seed,
             cache_dir=self.config["log_dirs"]["runs"],
             external_test_set=self.external_test,
+            explainability_cfg=expl_cfg,
         )
 
     def _save_results(self, results):
