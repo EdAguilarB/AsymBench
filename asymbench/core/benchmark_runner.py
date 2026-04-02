@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from asymbench.core.experiment import Experiment
+from asymbench.core.gnn_experiment import GNNExperiment
 from asymbench.data.loader import load_dataset
 from asymbench.data.splitter import MoleculeSplitter
 from asymbench.optimization.base import get_optimizer
@@ -12,7 +13,11 @@ from asymbench.preprocessing.feature_preprocessor import FeaturePreprocessor
 from asymbench.preprocessing.targets_scaler import TargetScaler
 from asymbench.representations import get_representation
 from asymbench.representations.circus import CachingCircusRepresentation
+from asymbench.representations.graph import GraphRepresentation
 from asymbench.representations.lookup import PrecomputedRepresentation
+
+_GNN_MODEL_TYPES = {"gnn"}
+_SKLEARN_INCOMPATIBLE_REPS = {"graph"}
 
 
 class BenchmarkRunner:
@@ -68,6 +73,9 @@ class BenchmarkRunner:
             }
             rep = get_representation(rep_config)
 
+            if rep_cfg.get("type") == "graph":
+                continue  # graph reps are built per-split inside GNNExperiment
+
             if hasattr(rep, "fit"):
                 continue  # trainable representation — handled per-experiment
 
@@ -96,6 +104,12 @@ class BenchmarkRunner:
             split_by_mol_col,
             seed,
         ) in combos:
+
+            # Skip incompatible representation/model pairings.
+            is_graph_rep = rep_cfg.get("type") in _SKLEARN_INCOMPATIBLE_REPS
+            is_gnn_model = model_cfg.get("type") in _GNN_MODEL_TYPES
+            if is_graph_rep != is_gnn_model:
+                continue
 
             split_cfg["train_size"] = train_set_size
 
@@ -133,12 +147,30 @@ class BenchmarkRunner:
         split_by_mol_col,
         seed,
     ):
-        # Build representation config
         rep_config = {
             "representation": rep_cfg,
             "data": self.config["dataset"],
         }
+        split_strategy = MoleculeSplitter(split_cfg)
 
+        # --- GNN path ---
+        if rep_cfg.get("type") == "graph":
+            representation = GraphRepresentation(rep_config)
+            return GNNExperiment(
+                dataset=self.dataset,
+                smiles_columns=self.config["dataset"]["smiles_columns"],
+                target=self.config["dataset"]["target"],
+                split_by_mol_col=split_by_mol_col,
+                representation=representation,
+                model_cfg=model_cfg,
+                y_scl_cfg=y_scl_cfg,
+                split_strategy=split_strategy,
+                seed=seed,
+                cache_dir=self.config["log_dirs"]["runs"],
+                external_test_set=self.external_test,
+            )
+
+        # --- sklearn path ---
         key = self._rep_key(rep_cfg)
         if key in self._precomputed:
             # Fit-free: wrap pre-computed features — no molecular computation at run time.
@@ -154,11 +186,7 @@ class BenchmarkRunner:
 
         preprocessing = FeaturePreprocessor(pre_cfg)
         y_scaling = TargetScaler(y_scl_cfg["scaling"])
-
-        # Build model
         optimizer = get_optimizer(model_cfg, seed)
-
-        split_strategy = MoleculeSplitter(split_cfg)
 
         return Experiment(
             dataset=self.dataset,
