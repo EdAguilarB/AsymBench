@@ -1,6 +1,7 @@
 from asymbench.representations.circus import CircusFeaturizer
 from asymbench.representations.descriptors import RDKitDescriptorFeaturizer
 from asymbench.representations.fingerprints import MorganFeaturizer
+from asymbench.representations.graph import GraphRepresentation
 from asymbench.representations.lookup import DataFrameLookupRepresentation
 from asymbench.representations.transformers import HFTransformerFeaturizer
 from asymbench.representations.unimol import UniMolFeaturizer
@@ -26,5 +27,8 @@ def get_representation(config):
 
     if rep_type == "unimol":
         return UniMolFeaturizer(config)
+
+    if rep_type == "graph":
+        return GraphRepresentation(config)
 
     raise ValueError(f"Unknown representation: {rep_type}")
