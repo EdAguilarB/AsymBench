@@ -10,7 +10,7 @@ from torch_geometric.loader import DataLoader
 from asymbench.data.splitter import MoleculeSplitter
 from asymbench.evaluation.metrics import evaluate_predictions
 from asymbench.gnn.featurizer import NODE_FEAT_DIM
-from asymbench.gnn.model import ReactionGCN
+from asymbench.gnn.architectures import BaseReactionGNN, build_reaction_gnn
 from asymbench.gnn.trainer import predict, train_epoch
 from asymbench.preprocessing.targets_scaler import TargetScaler
 from asymbench.utils.run_store import RunStore
@@ -173,15 +173,20 @@ class GNNExperiment:
         batch_size = self.model_params.get("batch_size", 32)
         return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
-    def _build_model(self) -> ReactionGCN:
-        return ReactionGCN(
+    def _build_model(self) -> BaseReactionGNN:
+        # Training-loop params are not forwarded to the model constructor
+        _TRAINING_KEYS = {"epochs", "lr", "batch_size"}
+        arch_params = {
+            k: v
+            for k, v in self.model_params.items()
+            if k not in _TRAINING_KEYS
+        }
+        return build_reaction_gnn(
             node_in_dim=NODE_FEAT_DIM,
-            hidden_dim=self.model_params.get("hidden_dim", 64),
-            num_layers=self.model_params.get("num_layers", 3),
-            pooling=self.model_params.get("pooling", "mean"),
+            **arch_params,
         ).to(self.device)
 
-    def _train(self, model: ReactionGCN, loader: DataLoader) -> None:
+    def _train(self, model: BaseReactionGNN, loader: DataLoader) -> None:
         optimizer = torch.optim.Adam(
             model.parameters(),
             lr=self.model_params.get("lr", 1e-3),
@@ -194,7 +199,7 @@ class GNNExperiment:
 
     def _explain(
         self,
-        model: ReactionGCN,
+        model: BaseReactionGNN,
         train_loader: DataLoader,
         test_loader: DataLoader,
         run_dir: Path,
@@ -227,13 +232,23 @@ class GNNExperiment:
     # Reporting helpers
     # ------------------------------------------------------------------
 
+    @property
+    def arch_label(self) -> str:
+        """Specific architecture name used for logging and result storage.
+
+        Returns the ``architecture`` param (e.g. ``"gcn"``, ``"gat"``,
+        ``"gin"``), falling back to ``"gcn"`` so existing configs that
+        omit the key continue to work.
+        """
+        return self.model_params.get("architecture", "gcn")
+
     def _build_metrics(self, y_test: np.ndarray, preds_test: np.ndarray) -> dict:
         metrics = evaluate_predictions(y_test, preds_test)
         split_cfg = getattr(self.split_strategy, "config", {})
         metrics.update(
             {
                 "cache_hit": False,
-                "model_type": self.model_cfg.get("type", "gnn"),
+                "model_type": self.arch_label,
                 "rep_type": "graph",
                 "split_sampler": split_cfg.get("sampler"),
                 "train_size": split_cfg.get("train_size"),
@@ -292,7 +307,7 @@ class GNNExperiment:
         split_cfg = getattr(self.split_strategy, "config", {})
         return {
             "representation": {"type": "graph"},
-            "model": {"type": self.model_cfg.get("type", "gnn")},
+            "model": {"type": self.arch_label},
             "split": {
                 "sampler": split_cfg.get("sampler", "unknown"),
                 "train_size": split_cfg.get("train_size"),
