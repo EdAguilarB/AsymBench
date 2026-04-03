@@ -208,9 +208,7 @@ class GNNExperiment:
         expl_cfg = self.explainability_cfg
         explainer = GNNExplainer(
             model=model,
-            attribution_method=expl_cfg.get(
-                "attribution_method", "ShapleyValueSampling"
-            ),
+            n_steps=expl_cfg.get("n_steps", 50),
             fragmentation=expl_cfg.get("fragmentation", "brics"),
         ).fit()
 
