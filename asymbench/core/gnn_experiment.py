@@ -191,15 +191,24 @@ class GNNExperiment:
         for i, data in enumerate(dataset._data):
             data.y = torch.tensor([y_scaled[i]], dtype=torch.float)
         batch_size = self.model_params.get("batch_size", 32)
+        num_workers = self.model_params.get("num_workers", 0)
         generator = None
         if shuffle:
             generator = torch.Generator()
             generator.manual_seed(self.seed)
-        return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, generator=generator)
+        return DataLoader(
+            dataset,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            generator=generator,
+            num_workers=num_workers,
+            # Page-locked memory speeds up CPU→GPU transfers when workers > 0
+            pin_memory=(num_workers > 0 and self.device.type == "cuda"),
+        )
 
     def _build_model(self) -> BaseReactionGNN:
         # Training-loop params are not forwarded to the model constructor
-        _TRAINING_KEYS = {"epochs", "lr", "batch_size"}
+        _TRAINING_KEYS = {"epochs", "lr", "batch_size", "num_workers"}
         arch_params = {
             k: v
             for k, v in self.model_params.items()
