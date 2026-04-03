@@ -1,14 +1,27 @@
 from typing import List, Optional
 
-import torch
 from rdkit import Chem
+import torch
 from torch_geometric.data import Data
 
 # ---------------------------------------------------------------------------
 # Allowable sets for one-hot encoding
 # ---------------------------------------------------------------------------
 
-ATOM_ELEMENTS: List[str] = ["H", "B", "C", "N", "O", "F", "Si", "P", "S", "Cl", "Br", "I"]
+ATOM_ELEMENTS: List[str] = [
+    "H",
+    "B",
+    "C",
+    "N",
+    "O",
+    "F",
+    "Si",
+    "P",
+    "S",
+    "Cl",
+    "Br",
+    "I",
+]
 
 ATOM_DEGREES: List[int] = [0, 1, 2, 3, 4, 5, 6]
 
@@ -36,33 +49,31 @@ BOND_TYPES = [
 ]
 
 # Z / E — no stereo encodes as all-zeros
-BOND_STEREO = [
-    Chem.rdchem.BondStereo.STEREOZ,
-    Chem.rdchem.BondStereo.STEREOE,
-]
+BOND_STEREO = [Chem.rdchem.BondStereo.STEREOZ, Chem.rdchem.BondStereo.STEREOE]
 
 # Pre-computed feature dimensions (useful for model initialisation)
 NODE_FEAT_DIM: int = (
-    len(ATOM_ELEMENTS)       # element
-    + len(ATOM_DEGREES)      # degree
+    len(ATOM_ELEMENTS)  # element
+    + len(ATOM_DEGREES)  # degree
     + len(ATOM_HYBRIDIZATIONS)  # hybridisation
     + len(ATOM_FORMAL_CHARGES)  # formal charge
     + len(ATOM_CHIRAL_TAGS)  # chirality
-    + 1                      # is_aromatic
-    + 1                      # is_in_ring
+    + 1  # is_aromatic
+    + 1  # is_in_ring
 )
 
 EDGE_FEAT_DIM: int = (
-    len(BOND_TYPES)    # bond type
-    + len(BOND_STEREO) # stereo
-    + 1                # is_in_ring
-    + 1                # is_conjugated
+    len(BOND_TYPES)  # bond type
+    + len(BOND_STEREO)  # stereo
+    + 1  # is_in_ring
+    + 1  # is_conjugated
 )
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _one_hot(value, allowable_set: list) -> List[int]:
     """Return a one-hot list aligned to *allowable_set*.
@@ -74,6 +85,7 @@ def _one_hot(value, allowable_set: list) -> List[int]:
 # ---------------------------------------------------------------------------
 # Per-atom and per-bond feature vectors
 # ---------------------------------------------------------------------------
+
 
 def atom_features(atom: Chem.rdchem.Atom) -> List[float]:
     """Return a flat float feature vector for a single RDKit atom."""
@@ -102,6 +114,7 @@ def bond_features(bond: Chem.rdchem.Bond) -> List[float]:
 # Molecule → PyG graph
 # ---------------------------------------------------------------------------
 
+
 def mol_to_graph(mol: Chem.Mol) -> Data:
     """Convert an RDKit *Mol* object into a :class:`torch_geometric.data.Data`.
 
@@ -112,8 +125,7 @@ def mol_to_graph(mol: Chem.Mol) -> Data:
     Chem.AssignStereochemistry(mol, cleanIt=True, force=True)
 
     x = torch.tensor(
-        [atom_features(atom) for atom in mol.GetAtoms()],
-        dtype=torch.float,
+        [atom_features(atom) for atom in mol.GetAtoms()], dtype=torch.float
     )
 
     edge_index_list: List[List[int]] = []
@@ -128,7 +140,9 @@ def mol_to_graph(mol: Chem.Mol) -> Data:
         edge_attr_list += [bf, bf]
 
     if edge_index_list:
-        edge_index = torch.tensor(edge_index_list, dtype=torch.long).t().contiguous()
+        edge_index = (
+            torch.tensor(edge_index_list, dtype=torch.long).t().contiguous()
+        )
         edge_attr = torch.tensor(edge_attr_list, dtype=torch.float)
     else:
         edge_index = torch.empty((2, 0), dtype=torch.long)
@@ -137,7 +151,9 @@ def mol_to_graph(mol: Chem.Mol) -> Data:
     return Data(x=x, edge_index=edge_index, edge_attr=edge_attr)
 
 
-def smiles_to_graph(smiles: str, include_hydrogens: bool = False) -> Optional[Data]:
+def smiles_to_graph(
+    smiles: str, include_hydrogens: bool = False
+) -> Optional[Data]:
     """Parse *smiles* with RDKit and return a PyG :class:`Data` graph.
 
     Returns ``None`` when the SMILES cannot be parsed.

@@ -35,20 +35,22 @@ from torch_geometric.nn import (
     global_mean_pool,
 )
 
-
 # ---------------------------------------------------------------------------
 # Pooling helpers
 # ---------------------------------------------------------------------------
 
+
 def _mean_max_pool(x: torch.Tensor, batch: torch.Tensor) -> torch.Tensor:
-    return torch.cat([global_mean_pool(x, batch), global_max_pool(x, batch)], dim=1)
+    return torch.cat(
+        [global_mean_pool(x, batch), global_max_pool(x, batch)], dim=1
+    )
 
 
 _POOLING_FNS: dict = {
-    "mean":     (global_mean_pool, 1),
-    "add":      (global_add_pool,  1),
-    "max":      (global_max_pool,  1),
-    "mean_max": (_mean_max_pool,   2),
+    "mean": (global_mean_pool, 1),
+    "add": (global_add_pool, 1),
+    "max": (global_max_pool, 1),
+    "mean_max": (_mean_max_pool, 2),
 }
 
 
@@ -66,6 +68,7 @@ def _make_pooling_fn(pooling: str):
 # ---------------------------------------------------------------------------
 # Base class
 # ---------------------------------------------------------------------------
+
 
 class BaseReactionGNN(nn.Module):
     """

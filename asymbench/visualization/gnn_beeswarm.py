@@ -27,19 +27,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-_SMILES_TRUNCATE = 28   # max characters shown in a fragment label
+_SMILES_TRUNCATE = 28  # max characters shown in a fragment label
 
 
 def _shorten_smiles(smi: str, max_len: int = _SMILES_TRUNCATE) -> str:
     """Truncate long SMILES so y-axis labels stay readable."""
     if len(smi) <= max_len:
         return smi
-    return smi[:max_len - 1] + "…"
+    return smi[: max_len - 1] + "…"
 
 
 def _clean_source(col: str) -> str:
@@ -53,6 +52,7 @@ def _clean_source(col: str) -> str:
 # ---------------------------------------------------------------------------
 # Main function
 # ---------------------------------------------------------------------------
+
 
 def plot_gnn_fragment_beeswarm(
     df: pd.DataFrame,
@@ -115,16 +115,14 @@ def plot_gnn_fragment_beeswarm(
     df["_label"] = df["_frag_short"] + "\n(" + df["_src_short"] + ")"
 
     # Mean importance per (fragment, source) pair — signed
-    mean_imp = (
-        df.groupby("_label")["importance"]
-        .mean()
-        .rename("mean_imp")
-    )
+    mean_imp = df.groupby("_label")["importance"].mean().rename("mean_imp")
 
     # Top-k most positive + top-k most negative, union of both sets
     top_pos = mean_imp.nlargest(top_k).index.tolist()
     top_neg = mean_imp.nsmallest(top_k).index.tolist()
-    selected = list(dict.fromkeys(top_pos + top_neg))  # preserves order, deduplicates
+    selected = list(
+        dict.fromkeys(top_pos + top_neg)
+    )  # preserves order, deduplicates
 
     df = df[df["_label"].isin(selected)].copy()
 
@@ -137,7 +135,7 @@ def plot_gnn_fragment_beeswarm(
     if vmax == 0:
         vmax = 1.0
     norm = mcolors.TwoSlopeNorm(vmin=-vmax, vcenter=0.0, vmax=vmax)
-    cmap = plt.cm.bwr   # blue → white → red
+    cmap = plt.cm.bwr  # blue → white → red
 
     # Auto-size figure height — up to 2*top_k rows now
     n_rows = len(order)
@@ -167,7 +165,9 @@ def plot_gnn_fragment_beeswarm(
         )
 
     # Zero line
-    ax.axvline(0.0, color="black", linewidth=0.8, linestyle="--", zorder=2, alpha=0.6)
+    ax.axvline(
+        0.0, color="black", linewidth=0.8, linestyle="--", zorder=2, alpha=0.6
+    )
 
     # Y-axis labels
     ax.set_yticks(range(n_rows))
@@ -204,10 +204,9 @@ def plot_gnn_fragment_beeswarm(
 # Convenience: load CSV and plot in one call
 # ---------------------------------------------------------------------------
 
+
 def plot_gnn_fragment_beeswarm_from_csv(
-    csv_path: Path,
-    outpath: Path | None = None,
-    **kwargs,
+    csv_path: Path, outpath: Path | None = None, **kwargs
 ) -> Path:
     """Load a ``fragment_importances.csv`` and call :func:`plot_gnn_fragment_beeswarm`.
 

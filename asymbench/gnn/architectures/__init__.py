@@ -26,8 +26,8 @@ Factory usage
 
 from __future__ import annotations
 
-from asymbench.gnn.architectures.gcn import ReactionGCN
 from asymbench.gnn.architectures.gat import ReactionGAT
+from asymbench.gnn.architectures.gcn import ReactionGCN
 from asymbench.gnn.architectures.gin import ReactionGIN
 from asymbench.gnn.base import BaseReactionGNN
 

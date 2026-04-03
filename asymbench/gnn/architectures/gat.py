@@ -93,7 +93,7 @@ class ReactionGAT(BaseReactionGNN):
                     out_channels=hidden_dim,
                     edge_dim=edge_in_dim,
                     heads=num_heads,
-                    concat=False,       # average heads → output stays hidden_dim
+                    concat=False,  # average heads → output stays hidden_dim
                     dropout=dropout,
                 )
                 for in_ch in in_channels

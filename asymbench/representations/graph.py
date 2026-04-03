@@ -37,7 +37,9 @@ class GraphRepresentation(BaseRepresentation):
             raise KeyError(
                 "config['data']['smiles_columns'] must be provided and non-empty"
             )
-        self.include_hydrogens: bool = self.rep_params.get("include_hydrogens", False)
+        self.include_hydrogens: bool = self.rep_params.get(
+            "include_hydrogens", False
+        )
 
     def transform(self, df: pd.DataFrame):
         """Build a :class:`ReactionGraphDataset` for every row in *df*.

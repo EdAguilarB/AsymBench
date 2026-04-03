@@ -27,9 +27,9 @@ YAML configuration example
 
 from __future__ import annotations
 
+from torch import Tensor
 import torch.nn as nn
 import torch.nn.functional as F
-from torch import Tensor
 from torch_geometric.nn import GCNConv
 
 from asymbench.gnn.base import BaseReactionGNN
@@ -69,7 +69,7 @@ class ReactionGCN(BaseReactionGNN):
         readout_layers: int = 2,
         dropout: float = 0.0,
         improved: bool = False,
-        **kwargs,          # absorb unknown YAML params gracefully
+        **kwargs,  # absorb unknown YAML params gracefully
     ) -> None:
         super().__init__(
             node_in_dim=node_in_dim,

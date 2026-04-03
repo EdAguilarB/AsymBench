@@ -1,17 +1,20 @@
+from asymbench.gnn.architectures import (
+    ReactionGAT,
+    ReactionGCN,
+    ReactionGIN,
+    build_reaction_gnn,
+)
+from asymbench.gnn.base import BaseReactionGNN
+from asymbench.gnn.dataset import ReactionGraphDataset
 from asymbench.gnn.featurizer import (
     EDGE_FEAT_DIM,
     NODE_FEAT_DIM,
     mol_to_graph,
     smiles_to_graph,
 )
-from asymbench.gnn.reaction_graph import ReactionGraphBuilder, merge_molecular_graphs
-from asymbench.gnn.dataset import ReactionGraphDataset
-from asymbench.gnn.base import BaseReactionGNN
-from asymbench.gnn.architectures import (
-    ReactionGCN,
-    ReactionGAT,
-    ReactionGIN,
-    build_reaction_gnn,
+from asymbench.gnn.reaction_graph import (
+    ReactionGraphBuilder,
+    merge_molecular_graphs,
 )
 
 __all__ = [

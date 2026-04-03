@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import random
 from pathlib import Path
+import random
 
 import numpy as np
 import pandas as pd
@@ -10,8 +10,8 @@ from torch_geometric.loader import DataLoader
 
 from asymbench.data.splitter import MoleculeSplitter
 from asymbench.evaluation.metrics import evaluate_predictions
-from asymbench.gnn.featurizer import NODE_FEAT_DIM
 from asymbench.gnn.architectures import BaseReactionGNN, build_reaction_gnn
+from asymbench.gnn.featurizer import NODE_FEAT_DIM
 from asymbench.gnn.trainer import predict, train_epoch
 from asymbench.preprocessing.targets_scaler import TargetScaler
 from asymbench.utils.run_store import RunStore
@@ -93,7 +93,9 @@ class GNNExperiment:
         self.run_store = RunStore(base_dir=self.cache_dir)
         self.external_test_set = external_test_set
         self.explainability_cfg: dict = explainability_cfg or {}
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu"
+        )
 
     # ------------------------------------------------------------------
     # Public entry point
@@ -118,8 +120,12 @@ class GNNExperiment:
             y_train_scaled = self.y_scaling.fit_transform(y_train)
             y_test_scaled = self.y_scaling.transform(y_test)
 
-            train_loader = self._make_loader(df_train, y_train_scaled, shuffle=True)
-            test_loader = self._make_loader(df_test, y_test_scaled, shuffle=False)
+            train_loader = self._make_loader(
+                df_train, y_train_scaled, shuffle=True
+            )
+            test_loader = self._make_loader(
+                df_test, y_test_scaled, shuffle=False
+            )
 
             model = self._build_model()
             self._train(model, train_loader)
@@ -140,8 +146,12 @@ class GNNExperiment:
             metrics = self._build_metrics(y_test_orig, preds_test)
             self._make_parity_plot(y_test_orig, preds_test, metrics, run_dir)
             self._save_predictions(
-                df_train, y_train_orig, preds_train,
-                df_test, y_test_orig, preds_test,
+                df_train,
+                y_train_orig,
+                preds_train,
+                df_test,
+                y_test_orig,
+                preds_test,
                 run_dir,
             )
             self.run_store.mark_completed(signature, metrics)
@@ -214,15 +224,13 @@ class GNNExperiment:
             for k, v in self.model_params.items()
             if k not in _TRAINING_KEYS
         }
-        return build_reaction_gnn(
-            node_in_dim=NODE_FEAT_DIM,
-            **arch_params,
-        ).to(self.device)
+        return build_reaction_gnn(node_in_dim=NODE_FEAT_DIM, **arch_params).to(
+            self.device
+        )
 
     def _train(self, model: BaseReactionGNN, loader: DataLoader) -> None:
         optimizer = torch.optim.Adam(
-            model.parameters(),
-            lr=self.model_params.get("lr", 1e-3),
+            model.parameters(), lr=self.model_params.get("lr", 1e-3)
         )
         epochs = self.model_params.get("epochs", 100)
         for epoch in range(epochs):
@@ -255,9 +263,7 @@ class GNNExperiment:
             dataset = loader.dataset
             node_masks = explainer.explain_dataset(dataset, self.device)
             frag_importances = get_fragment_importance(
-                dataset._data,
-                node_masks,
-                explainer.fragmentation,
+                dataset._data, node_masks, explainer.fragmentation
             )
             explainer.save(node_masks, frag_importances, outdir)
 
@@ -275,7 +281,9 @@ class GNNExperiment:
         """
         return self.model_params.get("architecture", "gcn")
 
-    def _build_metrics(self, y_test: np.ndarray, preds_test: np.ndarray) -> dict:
+    def _build_metrics(
+        self, y_test: np.ndarray, preds_test: np.ndarray
+    ) -> dict:
         metrics = evaluate_predictions(y_test, preds_test)
         split_cfg = getattr(self.split_strategy, "config", {})
         metrics.update(
@@ -334,7 +342,9 @@ class GNNExperiment:
             },
             index=df_test.index,
         )
-        pd.concat([train_df, test_df]).to_csv(run_dir / "predictions.csv", index=True)
+        pd.concat([train_df, test_df]).to_csv(
+            run_dir / "predictions.csv", index=True
+        )
 
     def _run_signature(self) -> dict:
         split_cfg = getattr(self.split_strategy, "config", {})

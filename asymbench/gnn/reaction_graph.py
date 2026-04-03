@@ -93,9 +93,7 @@ class ReactionGraphBuilder:
     """
 
     def __init__(
-        self,
-        smiles_cols: List[str],
-        include_hydrogens: bool = False,
+        self, smiles_cols: List[str], include_hydrogens: bool = False
     ) -> None:
         if not smiles_cols:
             raise ValueError("smiles_cols must be a non-empty list")
@@ -142,9 +140,7 @@ class ReactionGraphBuilder:
         return graph
 
     def build_dataset(
-        self,
-        df: pd.DataFrame,
-        target_col: Optional[str] = None,
+        self, df: pd.DataFrame, target_col: Optional[str] = None
     ) -> List[Data]:
         """Build reaction graphs for every row in *df*.
 

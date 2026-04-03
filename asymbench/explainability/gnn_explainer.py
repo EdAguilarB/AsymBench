@@ -25,15 +25,15 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+from rdkit import Chem
 import torch
 import torch.nn as nn
-from rdkit import Chem
 from torch_geometric.data import Data
-
 
 # ---------------------------------------------------------------------------
 # Fragmentation helpers
 # ---------------------------------------------------------------------------
+
 
 class FragmentationMethod(Enum):
     BRICS = "brics"
@@ -103,8 +103,7 @@ def _fragments_murcko(mol: Chem.Mol) -> Dict[str, List[List[int]]]:
 
 
 def fragment_and_match(
-    smiles: str,
-    fragmentation_method: FragmentationMethod,
+    smiles: str, fragmentation_method: FragmentationMethod
 ) -> Dict[str, List[List[int]]]:
     """Fragment *smiles* and return atom indices of every fragment occurrence.
 
@@ -127,6 +126,7 @@ def fragment_and_match(
 # ---------------------------------------------------------------------------
 # Fragment importance aggregation
 # ---------------------------------------------------------------------------
+
 
 def get_fragment_importance(
     data_list: list,
@@ -204,11 +204,9 @@ def get_fragment_importance(
 # Integrated Gradients core
 # ---------------------------------------------------------------------------
 
+
 def _integrated_gradients(
-    model: nn.Module,
-    data: Data,
-    device: torch.device,
-    n_steps: int = 50,
+    model: nn.Module, data: Data, device: torch.device, n_steps: int = 50
 ) -> np.ndarray:
     """Compute Integrated Gradients for node features of a single graph.
 
@@ -239,7 +237,7 @@ def _integrated_gradients(
     """
     model.eval()
 
-    x = data.x.float().to(device)             # [N, F]
+    x = data.x.float().to(device)  # [N, F]
     edge_index = data.edge_index.to(device)
     batch = torch.zeros(x.shape[0], dtype=torch.long, device=device)
 
@@ -248,8 +246,8 @@ def _integrated_gradients(
     if edge_attr is not None:
         edge_attr = edge_attr.float().to(device)
 
-    baseline = torch.zeros_like(x)            # all-zeros = neutral reference
-    delta = x - baseline                       # [N, F]
+    baseline = torch.zeros_like(x)  # all-zeros = neutral reference
+    delta = x - baseline  # [N, F]
 
     grads_sum = torch.zeros_like(x)
 
@@ -258,10 +256,7 @@ def _integrated_gradients(
         x_interp = (baseline + alpha * delta).requires_grad_(True)
 
         interp_data = Data(
-            x=x_interp,
-            edge_index=edge_index,
-            edge_attr=edge_attr,
-            batch=batch,
+            x=x_interp, edge_index=edge_index, edge_attr=edge_attr, batch=batch
         )
         out = model(interp_data)
 
@@ -270,7 +265,7 @@ def _integrated_gradients(
         grads_sum = grads_sum + grad.detach()
 
     avg_grads = grads_sum / n_steps
-    ig = delta * avg_grads                     # [N, F], signed
+    ig = delta * avg_grads  # [N, F], signed
 
     return ig.cpu().numpy()
 
@@ -278,6 +273,7 @@ def _integrated_gradients(
 # ---------------------------------------------------------------------------
 # Main explainability class
 # ---------------------------------------------------------------------------
+
 
 class GNNExplainer:
     """Signed node-attribute explainer for reaction GNNs.
@@ -302,10 +298,7 @@ class GNNExplainer:
     """
 
     def __init__(
-        self,
-        model: nn.Module,
-        n_steps: int = 50,
-        fragmentation: str = "brics",
+        self, model: nn.Module, n_steps: int = 50, fragmentation: str = "brics"
     ) -> None:
         self.model = model
         self.n_steps = n_steps
@@ -332,9 +325,7 @@ class GNNExplainer:
                     self.model, data, device, self.n_steps
                 )
             except Exception as exc:
-                print(
-                    f"Warning: IG failed for graph idx={data.idx}: {exc}"
-                )
+                print(f"Warning: IG failed for graph idx={data.idx}: {exc}")
 
         return node_masks
 
@@ -360,7 +351,9 @@ class GNNExplainer:
             ``(fragment, source)`` pairs ranked by mean absolute IG importance.
             Red dots push the prediction up; blue dots push it down.
         """
-        from asymbench.visualization.gnn_beeswarm import plot_gnn_fragment_beeswarm
+        from asymbench.visualization.gnn_beeswarm import (
+            plot_gnn_fragment_beeswarm,
+        )
 
         outdir = Path(outdir)
         outdir.mkdir(parents=True, exist_ok=True)
@@ -388,7 +381,5 @@ class GNNExplainer:
             df_frags.to_csv(outdir / "fragment_importances.csv", index=False)
 
             plot_gnn_fragment_beeswarm(
-                df_frags,
-                outpath=outdir / "fragment_beeswarm.png",
-                top_k=top_k,
+                df_frags, outpath=outdir / "fragment_beeswarm.png", top_k=top_k
             )
