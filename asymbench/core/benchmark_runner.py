@@ -128,7 +128,11 @@ class BenchmarkRunner:
 
             result = {
                 "representation": rep_cfg["type"],
-                "model": model_cfg["type"],
+                # For GNN models, model_type in metrics is the specific
+                # architecture (gcn/gat/gin); for sklearn models it is the
+                # model class name.  Prefer that over the raw YAML "type" key
+                # so different GNN architectures are distinguishable in results.
+                "model": metrics.get("model_type", model_cfg["type"]),
                 "split": split_cfg["sampler"],
                 "seed": seed,
                 **metrics,
