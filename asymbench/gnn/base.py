@@ -36,6 +36,46 @@ from torch_geometric.nn import (
 )
 
 # ---------------------------------------------------------------------------
+# Activation helper
+# ---------------------------------------------------------------------------
+
+_ACTIVATIONS: dict[str, type[nn.Module]] = {
+    "relu": nn.ReLU,
+    "leaky_relu": nn.LeakyReLU,
+    "elu": nn.ELU,
+    "silu": nn.SiLU,  # also known as Swish
+    "gelu": nn.GELU,
+    "tanh": nn.Tanh,
+}
+
+
+def _resolve_activation(name: str) -> nn.Module:
+    """Return an activation ``nn.Module`` from a string name.
+
+    Parameters
+    ----------
+    name:
+        Case-insensitive activation name.  Supported values:
+        ``"relu"`` (default), ``"leaky_relu"``, ``"elu"``,
+        ``"silu"`` / ``"swish"``, ``"gelu"``, ``"tanh"``.
+
+    Raises
+    ------
+    ValueError
+        If *name* is not recognised.
+    """
+    key = name.lower()
+    if key == "swish":  # common alias for SiLU
+        key = "silu"
+    if key not in _ACTIVATIONS:
+        raise ValueError(
+            f"Unknown activation {name!r}. "
+            f"Choose from: {list(_ACTIVATIONS)}."
+        )
+    return _ACTIVATIONS[key]()
+
+
+# ---------------------------------------------------------------------------
 # Pooling helpers
 # ---------------------------------------------------------------------------
 
@@ -101,6 +141,10 @@ class BaseReactionGNN(nn.Module):
     dropout:
         Dropout probability applied after each conv and readout activation.
         Set to ``0.0`` to disable.
+    activation:
+        Non-linearity applied after each conv layer and between readout
+        layers.  Accepted values: ``"relu"`` (default), ``"leaky_relu"``,
+        ``"elu"``, ``"silu"`` / ``"swish"``, ``"gelu"``, ``"tanh"``.
     """
 
     def __init__(
@@ -111,6 +155,7 @@ class BaseReactionGNN(nn.Module):
         pooling: str = "mean",
         readout_layers: int = 2,
         dropout: float = 0.0,
+        activation: str = "relu",
     ) -> None:
         super().__init__()
 
@@ -124,6 +169,7 @@ class BaseReactionGNN(nn.Module):
         self.num_layers = num_layers
         self.readout_layers = readout_layers
         self.dropout = dropout
+        self.act = _resolve_activation(activation)
 
         self.pooling_fn, pool_mult = _make_pooling_fn(pooling)
         self.graph_embedding_dim = hidden_dim * pool_mult
@@ -154,7 +200,7 @@ class BaseReactionGNN(nn.Module):
             out_dim = max(dim // 2, 1)
             layers.append(nn.Linear(dim, out_dim))
             layers.append(nn.BatchNorm1d(out_dim))
-            layers.append(nn.ReLU())
+            layers.append(type(self.act)())  # fresh instance, same class
             if self.dropout > 0.0:
                 layers.append(nn.Dropout(p=self.dropout))
             dim = out_dim
@@ -200,7 +246,7 @@ class BaseReactionGNN(nn.Module):
             Graph-level embedding, shape ``(batch_size, graph_embedding_dim)``.
         """
         for conv, bn in zip(self.conv_layers, self.norm_layers):
-            x = F.relu(bn(conv(x, edge_index, edge_attr)))
+            x = self.act(bn(conv(x, edge_index, edge_attr)))
             if self.dropout > 0.0:
                 x = F.dropout(x, p=self.dropout, training=self.training)
         return self.pooling_fn(x, batch)

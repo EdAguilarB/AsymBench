@@ -58,6 +58,10 @@ class ReactionGAT(BaseReactionGNN):
     edge_in_dim:
         Dimensionality of edge features.  Defaults to the package-level
         ``EDGE_FEAT_DIM`` so you rarely need to set this manually.
+    activation:
+        Non-linearity after each conv layer and in the readout MLP.
+        ``"relu"`` (default), ``"leaky_relu"``, ``"elu"``, ``"silu"``,
+        ``"gelu"``, ``"tanh"``.
     """
 
     ARCH_NAME = "gat"
@@ -70,6 +74,7 @@ class ReactionGAT(BaseReactionGNN):
         pooling: str = "mean",
         readout_layers: int = 2,
         dropout: float = 0.1,
+        activation: str = "relu",
         num_heads: int = 4,
         edge_in_dim: int = EDGE_FEAT_DIM,
         **kwargs,
@@ -81,6 +86,7 @@ class ReactionGAT(BaseReactionGNN):
             pooling=pooling,
             readout_layers=readout_layers,
             dropout=dropout,
+            activation=activation,
         )
         self.num_heads = num_heads
         self.edge_in_dim = edge_in_dim

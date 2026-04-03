@@ -29,16 +29,16 @@ from __future__ import annotations
 import torch.nn as nn
 from torch_geometric.nn import GINEConv
 
-from asymbench.gnn.base import BaseReactionGNN
+from asymbench.gnn.base import BaseReactionGNN, _resolve_activation
 from asymbench.gnn.featurizer import EDGE_FEAT_DIM
 
 
-def _gin_mlp(in_dim: int, out_dim: int) -> nn.Sequential:
+def _gin_mlp(in_dim: int, out_dim: int, act: nn.Module) -> nn.Sequential:
     """Two-layer MLP used as the aggregation function inside each GINEConv."""
     return nn.Sequential(
         nn.Linear(in_dim, out_dim),
         nn.BatchNorm1d(out_dim),
-        nn.ReLU(),
+        type(act)(),  # fresh instance of the chosen activation
         nn.Linear(out_dim, out_dim),
     )
 
@@ -66,6 +66,10 @@ class ReactionGIN(BaseReactionGNN):
     edge_in_dim:
         Dimensionality of edge features.  Defaults to the package-level
         ``EDGE_FEAT_DIM`` so you rarely need to set this manually.
+    activation:
+        Non-linearity used inside the GINEConv MLP, after each conv layer,
+        and in the readout MLP.  ``"relu"`` (default), ``"leaky_relu"``,
+        ``"elu"``, ``"silu"``, ``"gelu"``, ``"tanh"``.
     """
 
     ARCH_NAME = "gin"
@@ -78,6 +82,7 @@ class ReactionGIN(BaseReactionGNN):
         pooling: str = "mean",
         readout_layers: int = 2,
         dropout: float = 0.0,
+        activation: str = "relu",
         train_eps: bool = False,
         edge_in_dim: int = EDGE_FEAT_DIM,
         **kwargs,
@@ -89,6 +94,7 @@ class ReactionGIN(BaseReactionGNN):
             pooling=pooling,
             readout_layers=readout_layers,
             dropout=dropout,
+            activation=activation,
         )
         self.train_eps = train_eps
         self.edge_in_dim = edge_in_dim
@@ -97,7 +103,7 @@ class ReactionGIN(BaseReactionGNN):
         self.conv_layers = nn.ModuleList(
             [
                 GINEConv(
-                    nn=_gin_mlp(in_dim, hidden_dim),
+                    nn=_gin_mlp(in_dim, hidden_dim, self.act),
                     train_eps=train_eps,
                     edge_dim=edge_in_dim,
                 )

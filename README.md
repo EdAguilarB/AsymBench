@@ -415,6 +415,10 @@ models:
       readout_layers: 2       # MLP depth including output       [default: 2]
                               # 2 → hidden → hidden//2 → 1
       dropout: 0.0            # dropout probability              [default: 0.0]
+      activation: relu        # relu | leaky_relu | elu | silu   [default: relu]
+                              # | gelu | tanh
+                              # applied after every conv layer
+                              # and between readout MLP layers
 
       # GCN-specific
       improved: false         # self-loop weight = 2             [default: false]
@@ -436,6 +440,7 @@ models:
       pooling: mean
       readout_layers: 2
       dropout: 0.1            # applied inside attention layers too
+      activation: relu        # relu | leaky_relu | elu | silu | gelu | tanh
 
       # GAT-specific
       num_heads: 4            # attention heads per layer        [default: 4]
@@ -458,6 +463,8 @@ models:
       pooling: mean_max
       readout_layers: 2
       dropout: 0.0
+      activation: relu        # relu | leaky_relu | elu | silu | gelu | tanh
+                              # also used inside each GINEConv MLP
 
       # GIN-specific
       train_eps: false        # learn epsilon per layer          [default: false]
@@ -565,7 +572,7 @@ Reaction SMILES
 Merged reaction graph  [N nodes, E edges]
     ↓
 Graph conv layers × num_layers  (GCN / GAT / GIN)
-+ BatchNorm + ReLU + Dropout
++ BatchNorm + activation + Dropout
     ↓
 Global pooling  (mean / add / max / mean_max)
     ↓
@@ -584,6 +591,7 @@ Predicted ΔΔG‡
 | `pooling` | all | `mean` / `add` / `max` / `mean_max` | `mean` |
 | `readout_layers` | all | int ≥ 1 | `2` |
 | `dropout` | all | 0.0 – 1.0 | `0.0` |
+| `activation` | all | `relu` / `leaky_relu` / `elu` / `silu` / `gelu` / `tanh` | `relu` |
 | `improved` | GCN | bool | `false` |
 | `num_heads` | GAT | int | `4` |
 | `train_eps` | GIN | bool | `false` |
@@ -594,6 +602,8 @@ Predicted ΔΔG‡
 | `num_workers` | all | int | `0` |
 
 `mean_max` pooling concatenates global mean and max pools, doubling the embedding fed to the readout MLP (e.g. `hidden_dim=64` → 128-dim input to the MLP).
+
+`activation` controls the non-linearity applied after every graph conv layer, between readout MLP layers, and — for GIN — inside each GINEConv aggregation MLP. `silu` (also accepted as `swish`) and `gelu` are smooth alternatives to `relu` that often improve convergence on molecular tasks.
 
 ---
 

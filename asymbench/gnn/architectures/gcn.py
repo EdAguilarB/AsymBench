@@ -32,7 +32,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
 
-from asymbench.gnn.base import BaseReactionGNN
+from asymbench.gnn.base import BaseReactionGNN, _resolve_activation
 
 
 class ReactionGCN(BaseReactionGNN):
@@ -56,6 +56,10 @@ class ReactionGCN(BaseReactionGNN):
     improved:
         Use improved GCN normalisation (self-loop weight = 2 instead of 1).
         See Kipf & Welling (2017) for details.
+    activation:
+        Non-linearity after each conv layer and in the readout MLP.
+        ``"relu"`` (default), ``"leaky_relu"``, ``"elu"``, ``"silu"``,
+        ``"gelu"``, ``"tanh"``.
     """
 
     ARCH_NAME = "gcn"
@@ -68,6 +72,7 @@ class ReactionGCN(BaseReactionGNN):
         pooling: str = "mean",
         readout_layers: int = 2,
         dropout: float = 0.0,
+        activation: str = "relu",
         improved: bool = False,
         **kwargs,  # absorb unknown YAML params gracefully
     ) -> None:
@@ -78,6 +83,7 @@ class ReactionGCN(BaseReactionGNN):
             pooling=pooling,
             readout_layers=readout_layers,
             dropout=dropout,
+            activation=activation,
         )
         self.improved = improved
 
@@ -103,7 +109,7 @@ class ReactionGCN(BaseReactionGNN):
         batch: Tensor,
     ) -> Tensor:
         for conv, bn in zip(self.conv_layers, self.norm_layers):
-            x = F.relu(bn(conv(x, edge_index)))
+            x = self.act(bn(conv(x, edge_index)))
             if self.dropout > 0.0:
                 x = F.dropout(x, p=self.dropout, training=self.training)
         return self.pooling_fn(x, batch)
