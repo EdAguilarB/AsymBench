@@ -38,7 +38,7 @@ def _gin_mlp(in_dim: int, out_dim: int, act: nn.Module) -> nn.Sequential:
     return nn.Sequential(
         nn.Linear(in_dim, out_dim),
         nn.BatchNorm1d(out_dim),
-        type(act)(),           # fresh instance of the chosen activation
+        type(act)(),  # fresh instance of the chosen activation
         nn.Linear(out_dim, out_dim),
     )
 

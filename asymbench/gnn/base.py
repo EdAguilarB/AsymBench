@@ -35,18 +35,17 @@ from torch_geometric.nn import (
     global_mean_pool,
 )
 
-
 # ---------------------------------------------------------------------------
 # Activation helper
 # ---------------------------------------------------------------------------
 
 _ACTIVATIONS: dict[str, type[nn.Module]] = {
-    "relu":       nn.ReLU,
+    "relu": nn.ReLU,
     "leaky_relu": nn.LeakyReLU,
-    "elu":        nn.ELU,
-    "silu":       nn.SiLU,      # also known as Swish
-    "gelu":       nn.GELU,
-    "tanh":       nn.Tanh,
+    "elu": nn.ELU,
+    "silu": nn.SiLU,  # also known as Swish
+    "gelu": nn.GELU,
+    "tanh": nn.Tanh,
 }
 
 
@@ -66,7 +65,7 @@ def _resolve_activation(name: str) -> nn.Module:
         If *name* is not recognised.
     """
     key = name.lower()
-    if key == "swish":        # common alias for SiLU
+    if key == "swish":  # common alias for SiLU
         key = "silu"
     if key not in _ACTIVATIONS:
         raise ValueError(
@@ -74,6 +73,7 @@ def _resolve_activation(name: str) -> nn.Module:
             f"Choose from: {list(_ACTIVATIONS)}."
         )
     return _ACTIVATIONS[key]()
+
 
 # ---------------------------------------------------------------------------
 # Pooling helpers
@@ -200,7 +200,7 @@ class BaseReactionGNN(nn.Module):
             out_dim = max(dim // 2, 1)
             layers.append(nn.Linear(dim, out_dim))
             layers.append(nn.BatchNorm1d(out_dim))
-            layers.append(type(self.act)())   # fresh instance, same class
+            layers.append(type(self.act)())  # fresh instance, same class
             if self.dropout > 0.0:
                 layers.append(nn.Dropout(p=self.dropout))
             dim = out_dim
