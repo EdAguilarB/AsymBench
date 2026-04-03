@@ -1,14 +1,20 @@
-"""GNN explainability via CaptumExplainer + molecular fragment attribution.
+"""GNN explainability via Integrated Gradients + molecular fragment attribution.
 
-Workflow
---------
-1. A trained :class:`~asymbench.gnn.model.ReactionGCN` is wrapped so its
-   forward signature matches what PyG's CaptumExplainer expects.
-2. For every reaction graph, the explainer computes a *node mask* — a
-   per-atom, per-feature importance tensor.
-3. The node masks are aggregated to fragment-level scores by fragmenting
-   each component molecule with BRICS or Murcko scaffold decomposition and
-   summing the atom importances that fall inside each fragment.
+Integrated Gradients (Sundararajan et al., 2017) attributes the model output
+to input node features by integrating the gradient along a straight-line path
+from a baseline (all-zeros) to the actual input.  Crucially, the resulting
+attribution scores are **signed**:
+
+* **Positive** → the feature pushes the prediction *above* the baseline
+* **Negative** → the feature pushes the prediction *below* the baseline
+
+This mirrors SHAP-value semantics for tabular models and requires nothing
+beyond PyTorch — no captum, no numpy-version constraints.
+
+Reference
+---------
+Sundararajan, M., Taly, A., & Yan, Q. (2017).
+Axiomatic Attribution for Deep Networks. ICML 2017.
 """
 
 from __future__ import annotations
@@ -54,13 +60,7 @@ def _remove_dummy_atoms(mol: Chem.Mol) -> Optional[Chem.Mol]:
 
 
 def _fragments_brics(mol: Chem.Mol) -> Dict[str, List[List[int]]]:
-    """BRICS decomposition with atom-index mapping.
-
-    Returns
-    -------
-    dict
-        ``{canonical_fragment_smiles: [[atom_indices_occurrence_0], ...]}``
-    """
+    """BRICS decomposition with atom-index mapping."""
     from rdkit.Chem import BRICS
 
     raw_frags = BRICS.BRICSDecompose(mol, returnMols=False)
@@ -82,13 +82,7 @@ def _fragments_brics(mol: Chem.Mol) -> Dict[str, List[List[int]]]:
 
 
 def _fragments_murcko(mol: Chem.Mol) -> Dict[str, List[List[int]]]:
-    """Murcko scaffold with atom-index mapping.
-
-    Returns
-    -------
-    dict
-        ``{scaffold_smiles: [[atom_indices]]}``  (single occurrence)
-    """
+    """Murcko scaffold with atom-index mapping."""
     from rdkit.Chem.Scaffolds import MurckoScaffold
 
     scaffold_smi = MurckoScaffold.MurckoScaffoldSmiles(
@@ -112,20 +106,12 @@ def fragment_and_match(
     smiles: str,
     fragmentation_method: FragmentationMethod,
 ) -> Dict[str, List[List[int]]]:
-    """Fragment *smiles* and return the atom indices of every fragment occurrence.
-
-    Parameters
-    ----------
-    smiles:
-        SMILES of the molecule to fragment.
-    fragmentation_method:
-        Which fragmentation strategy to apply.
+    """Fragment *smiles* and return atom indices of every fragment occurrence.
 
     Returns
     -------
     dict
-        ``{fragment_smiles: [[atom_idx, ...], ...]}`` — each inner list is
-        one occurrence of the fragment in the parent molecule.
+        ``{fragment_smiles: [[atom_idx, ...], ...]}``
     """
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
@@ -146,20 +132,27 @@ def get_fragment_importance(
     data_list: list,
     node_masks: Dict,
     fragmentation_method: FragmentationMethod,
-) -> Dict[str, List[float]]:
-    """Aggregate per-atom node masks to fragment-level importance scores.
+) -> Dict[Tuple[str, str], List[float]]:
+    """Aggregate signed per-atom IG scores to fragment-level importances.
 
     Each reaction graph is a concatenation of molecular graphs.  The function
     iterates over the per-molecule SMILES stored in ``data.mol_smiles``,
     fragments each molecule, and sums the node-mask values over the atoms
     belonging to each fragment occurrence.
 
+    Fragments are keyed by ``(fragment_smiles, source_column)`` so that the
+    same substructure appearing in different reaction components (e.g. a
+    phenyl ring in both the substrate and the ligand) is tracked separately.
+
+    Fragment scores inherit the sign of the underlying IG attributions —
+    a positive score means the fragment contributes towards a higher
+    prediction; negative means it pulls the prediction down.
+
     Parameters
     ----------
     data_list:
-        List of PyG :class:`Data` objects (``dataset._data``).  Each must
-        have a ``mol_smiles`` attribute — a list of ``(column_name, smiles)``
-        pairs in the same order as the molecules were concatenated.
+        ``dataset._data`` — each item must have ``data.mol_smiles``,
+        a list of ``(column_name, smiles)`` pairs.
     node_masks:
         ``{data.idx: np.ndarray shape [num_nodes, num_features]}``
     fragmentation_method:
@@ -168,10 +161,9 @@ def get_fragment_importance(
     Returns
     -------
     dict
-        ``{fragment_smiles: [importance_score, ...]}`` — one score per
-        fragment occurrence across the whole dataset.
+        ``{(fragment_smiles, source_col): [signed_score, ...]}``
     """
-    frags_importances: Dict[str, List[float]] = {}
+    frags_importances: Dict[Tuple[str, str], List[float]] = {}
 
     for data in data_list:
         mol_idx = data.idx
@@ -181,7 +173,7 @@ def get_fragment_importance(
         node_mask = node_masks[mol_idx]  # [num_nodes, num_features]
         num_atoms = 0
 
-        for _col, smiles in data.mol_smiles:
+        for col, smiles in data.mol_smiles:
             mol_obj = Chem.MolFromSmiles(smiles)
             mol_num_atoms = mol_obj.GetNumAtoms() if mol_obj is not None else 0
 
@@ -194,12 +186,14 @@ def get_fragment_importance(
             for frag_smiles, atom_indices_list in frags.items():
                 if len(frag_smiles) < 3:
                     continue
-                frags_importances.setdefault(frag_smiles, [])
+                key = (frag_smiles, col)
+                frags_importances.setdefault(key, [])
 
                 for atom_indices in atom_indices_list:
                     global_indices = [num_atoms + i for i in atom_indices]
+                    # Sum over atoms and features — signed because IG can be negative
                     frag_score = float(np.sum(node_mask[global_indices]))
-                    frags_importances[frag_smiles].append(frag_score)
+                    frags_importances[key].append(frag_score)
 
             num_atoms += mol_num_atoms
 
@@ -207,28 +201,68 @@ def get_fragment_importance(
 
 
 # ---------------------------------------------------------------------------
-# Model wrapper required by CaptumExplainer
+# Integrated Gradients core
 # ---------------------------------------------------------------------------
 
-class _ExplainerModelWrapper(nn.Module):
-    """Adapts :class:`ReactionGCN` to the ``(x, edge_index, **kwargs)``
-    signature expected by PyG's :class:`CaptumExplainer`.
+def _integrated_gradients(
+    model: nn.Module,
+    data: Data,
+    device: torch.device,
+    n_steps: int = 50,
+) -> np.ndarray:
+    """Compute Integrated Gradients for node features of a single graph.
 
-    When called on a single (unbatched) graph, a batch tensor of all zeros
-    is synthesised so that the global pooling layer works correctly.
+    Uses a straight-line path from an all-zeros baseline to the actual
+    node-feature matrix.  The integral is approximated by a Riemann sum
+    with *n_steps* equally-spaced interpolation points.
+
+    ``torch.autograd.grad`` is used rather than ``backward()`` to avoid
+    accumulating spurious gradients in the model's parameter buffers.
+
+    Parameters
+    ----------
+    model:
+        Trained GNN in eval mode.
+    data:
+        Single (unbatched) reaction graph.
+    device:
+        Torch device to run inference on.
+    n_steps:
+        Number of Riemann sum steps (higher → more accurate, slower).
+
+    Returns
+    -------
+    np.ndarray, shape ``[num_nodes, num_features]``
+        Signed attributions.  Positive values indicate that the feature
+        pushes the prediction above the baseline; negative values push it
+        below.
     """
+    model.eval()
 
-    def __init__(self, model: nn.Module) -> None:
-        super().__init__()
-        self.model = model
+    x = data.x.float().to(device)             # [N, F]
+    edge_index = data.edge_index.to(device)
+    batch = torch.zeros(x.shape[0], dtype=torch.long, device=device)
 
-    def forward(self, x: torch.Tensor, edge_index: torch.Tensor, **kwargs):
-        batch = kwargs.get("batch")
-        if batch is None:
-            batch = torch.zeros(x.shape[0], dtype=torch.long, device=x.device)
-        data = Data(x=x, edge_index=edge_index, batch=batch)
-        out = self.model(data)
-        return out.view(-1)  # [batch_size]
+    baseline = torch.zeros_like(x)            # all-zeros = neutral reference
+    delta = x - baseline                       # [N, F]
+
+    grads_sum = torch.zeros_like(x)
+
+    for step in range(1, n_steps + 1):
+        alpha = step / n_steps
+        x_interp = (baseline + alpha * delta).requires_grad_(True)
+
+        interp_data = Data(x=x_interp, edge_index=edge_index, batch=batch)
+        out = model(interp_data)
+
+        # Gradient of scalar output w.r.t. x_interp only — model params untouched
+        (grad,) = torch.autograd.grad(out.sum(), x_interp)
+        grads_sum = grads_sum + grad.detach()
+
+    avg_grads = grads_sum / n_steps
+    ig = delta * avg_grads                     # [N, F], signed
+
+    return ig.cpu().numpy()
 
 
 # ---------------------------------------------------------------------------
@@ -236,101 +270,60 @@ class _ExplainerModelWrapper(nn.Module):
 # ---------------------------------------------------------------------------
 
 class GNNExplainer:
-    """Node-attribute explainer for reaction GNNs.
+    """Signed node-attribute explainer for reaction GNNs.
 
-    Uses PyG's :class:`~torch_geometric.explain.Explainer` with a
-    configurable Captum attribution method (default:
-    ``ShapleyValueSampling``) to produce per-atom importance scores, then
-    aggregates them to molecular fragment level.
+    Computes **Integrated Gradients** (Sundararajan et al., 2017) for every
+    reaction graph in a dataset, then aggregates the signed per-atom
+    importances to molecular fragment level.
+
+    Unlike mask-optimisation approaches (PyG's GNNExplainer), IG attributions
+    can be negative, giving the same directional information as SHAP values
+    for tabular models.
 
     Parameters
     ----------
     model:
         A trained :class:`~asymbench.gnn.model.ReactionGCN`.
-    attribution_method:
-        Name of the ``captum.attr`` class to use, e.g.
-        ``"ShapleyValueSampling"``, ``"IntegratedGradients"``,
-        ``"Saliency"``.
+    n_steps:
+        Number of Riemann-sum steps for the IG approximation (default 50;
+        use ≥ 100 for publication-quality results).
     fragmentation:
-        ``"brics"`` (BRICS decomposition) or ``"murcko_scaffold"``
-        (Murcko scaffold extraction).
+        ``"brics"`` or ``"murcko_scaffold"``.
     """
 
     def __init__(
         self,
         model: nn.Module,
-        attribution_method: str = "ShapleyValueSampling",
+        n_steps: int = 50,
         fragmentation: str = "brics",
     ) -> None:
         self.model = model
-        self.attribution_method = attribution_method
+        self.n_steps = n_steps
         self.fragmentation = FragmentationMethod(fragmentation)
-        self._explainer = None
 
     def fit(self) -> "GNNExplainer":
-        """Build the PyG Explainer.  Call once after model training."""
-        import captum.attr
-        from torch_geometric.explain import CaptumExplainer, Explainer, ModelConfig
-
-        attr_cls = getattr(captum.attr, self.attribution_method, None)
-        if attr_cls is None:
-            raise ValueError(
-                f"captum.attr has no attribute {self.attribution_method!r}. "
-                f"Common choices: ShapleyValueSampling, IntegratedGradients, Saliency."
-            )
-
-        algorithm = CaptumExplainer(attribution_method=attr_cls)
-        wrapped = _ExplainerModelWrapper(self.model)
-
-        self._explainer = Explainer(
-            model=wrapped,
-            algorithm=algorithm,
-            explanation_type="model",
-            node_mask_type="attributes",
-            edge_mask_type=None,
-            model_config=ModelConfig(
-                mode="regression",
-                task_level="graph",
-                return_type="raw",
-            ),
-        )
+        """No-op — IG is computed on-the-fly.  Kept for API consistency."""
         return self
 
     def explain_dataset(self, dataset, device) -> Dict:
-        """Compute node masks for every graph in *dataset*.
-
-        Parameters
-        ----------
-        dataset:
-            A :class:`~asymbench.gnn.dataset.ReactionGraphDataset`.
-        device:
-            Torch device to run inference on.
+        """Compute signed IG node masks for every graph in *dataset*.
 
         Returns
         -------
         dict
             ``{data.idx: np.ndarray shape [num_nodes, num_features]}``
         """
-        if self._explainer is None:
-            raise RuntimeError("Call GNNExplainer.fit() before explain_dataset().")
-
         self.model.eval()
         node_masks: Dict = {}
 
         for data in dataset._data:
-            data = data.to(device)
             try:
-                explanation = self._explainer(
-                    x=data.x,
-                    edge_index=data.edge_index,
-                    batch=None,
-                )
-                node_masks[data.idx] = (
-                    explanation.node_mask.detach().cpu().numpy()
+                node_masks[data.idx] = _integrated_gradients(
+                    self.model, data, device, self.n_steps
                 )
             except Exception as exc:
                 print(
-                    f"Warning: explanation failed for graph idx={data.idx}: {exc}"
+                    f"Warning: IG failed for graph idx={data.idx}: {exc}"
                 )
 
         return node_masks
@@ -338,8 +331,9 @@ class GNNExplainer:
     def save(
         self,
         node_masks: Dict,
-        frag_importances: Dict[str, List[float]],
+        frag_importances: Dict[Tuple[str, str], List[float]],
         outdir: Path,
+        top_k: int = 5,
     ) -> None:
         """Persist node masks and fragment importances to *outdir*.
 
@@ -348,8 +342,16 @@ class GNNExplainer:
         ``node_masks.npz``
             Compressed numpy archive keyed by reaction index.
         ``fragment_importances.csv``
-            Columns: fragment, mean_importance, std_importance, count.
+            Long-format CSV with one row per individual IG score.
+            Columns: fragment, source, importance.
+            Sorted by fragment then source for easy beeswarm plot construction.
+        ``fragment_beeswarm.png``
+            SHAP-style horizontal beeswarm plot of the top-*k*
+            ``(fragment, source)`` pairs ranked by mean absolute IG importance.
+            Red dots push the prediction up; blue dots push it down.
         """
+        from asymbench.visualization.gnn_beeswarm import plot_gnn_fragment_beeswarm
+
         outdir = Path(outdir)
         outdir.mkdir(parents=True, exist_ok=True)
 
@@ -361,15 +363,22 @@ class GNNExplainer:
         if frag_importances:
             rows = [
                 {
-                    "fragment": frag,
-                    "mean_importance": float(np.mean(scores)),
-                    "std_importance": float(np.std(scores)),
-                    "count": len(scores),
+                    "fragment": frag_smi,
+                    "source": source_col,
+                    "importance": score,
                 }
-                for frag, scores in frag_importances.items()
+                for (frag_smi, source_col), scores in frag_importances.items()
+                for score in scores
             ]
-            (
+            df_frags = (
                 pd.DataFrame(rows)
-                .sort_values("mean_importance", ascending=False)
-                .to_csv(outdir / "fragment_importances.csv", index=False)
+                .sort_values(["fragment", "source"])
+                .reset_index(drop=True)
+            )
+            df_frags.to_csv(outdir / "fragment_importances.csv", index=False)
+
+            plot_gnn_fragment_beeswarm(
+                df_frags,
+                outpath=outdir / "fragment_beeswarm.png",
+                top_k=top_k,
             )
