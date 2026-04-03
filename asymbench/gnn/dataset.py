@@ -1,28 +1,44 @@
-import torch
+from typing import List, Optional
+
+import pandas as pd
 from torch_geometric.data import Dataset
 
-from asymbench.gnn.featurizer import smiles_to_graph
+from asymbench.gnn.reaction_graph import ReactionGraphBuilder
 
 
-class ReactionDataset(Dataset):
-    def __init__(self, df, smiles_cols, target):
-        self.df = df.reset_index(drop=True)
-        self.smiles_cols = smiles_cols
-        self.target = target
+class ReactionGraphDataset(Dataset):
+    """In-memory PyG dataset of reaction graphs.
 
-    def len(self):
-        return len(self.df)
+    Each sample is a single :class:`torch_geometric.data.Data` object
+    representing the reaction as a disconnected graph of its constituent
+    molecules (see :class:`~asymbench.gnn.reaction_graph.ReactionGraphBuilder`).
 
-    def get(self, idx):
-        row = self.df.iloc[idx]
+    Parameters
+    ----------
+    df:
+        DataFrame with one reaction per row.
+    smiles_cols:
+        Column names holding SMILES for each reaction component.
+    target_col:
+        Column name for the regression/classification target.  If ``None``,
+        ``data.y`` is not set.
+    include_hydrogens:
+        Add explicit H atoms before featurisation.
+    """
 
-        graphs = []
-        for col in self.smiles_cols:
-            g = smiles_to_graph(row[col])
-            if g is None:
-                return None
-            graphs.append(g)
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        smiles_cols: List[str],
+        target_col: Optional[str] = None,
+        include_hydrogens: bool = False,
+    ) -> None:
+        super().__init__()
+        builder = ReactionGraphBuilder(smiles_cols, include_hydrogens)
+        self._data: List = builder.build_dataset(df, target_col)
 
-        y = torch.tensor([row[self.target]], dtype=torch.float)
+    def len(self) -> int:
+        return len(self._data)
 
-        return graphs, y
+    def get(self, idx: int):
+        return self._data[idx]

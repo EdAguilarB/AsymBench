@@ -29,6 +29,7 @@ class Experiment:
         seed: int,
         cache_dir: Path = Path("experiment_runs"),
         external_test_set: pd.DataFrame | None = None,
+        explainability_cfg: dict | None = None,
     ):
         self.dataset = dataset
         self.smiles_columns = smiles_columns
@@ -44,6 +45,7 @@ class Experiment:
         self.run_store = RunStore(base_dir=self.cache_dir)
         self.model_cfg = getattr(self.optimizer, "model_cfg", None)
         self.external_test_set = external_test_set
+        self.explainability_cfg: dict = explainability_cfg or {}
 
     def run(self):
         model_type = self.model_cfg.get("type", None)
@@ -120,9 +122,13 @@ class Experiment:
         return best_model.predict(X_train), best_model.predict(X_test)
 
     def _explain(self, best_model, X_train, X_test, run_dir: Path):
+        if not self.explainability_cfg.get("enabled", False):
+            return
         expl_dir = run_dir / "explainability"
+        max_bg = self.explainability_cfg.get("max_background", 200)
+        max_ex = self.explainability_cfg.get("max_explain", 500)
         shapx = ShapExplainer(
-            max_background=200, max_explain=500, seed=self.seed
+            max_background=max_bg, max_explain=max_ex, seed=self.seed
         ).fit(best_model, X_train)
         shapx.explain(X_train, outdir=expl_dir, prefix="train")
         shapx.explain(X_test, outdir=expl_dir, prefix="test")

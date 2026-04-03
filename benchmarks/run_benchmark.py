@@ -1,3 +1,4 @@
+import logging
 import os
 
 # Must be set before any OpenMP-linked library (numpy, torch, unimol_tools) is
@@ -8,6 +9,12 @@ os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
+# Some dependencies (e.g. unimol_tools) call logging.basicConfig(level=DEBUG),
+# which causes every matplotlib sub-logger to emit internal debug lines
+# (font scanning, backend loading, tick locators, …).
+# Silencing the top-level "matplotlib" logger suppresses all of them at once.
+logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
 import argparse
 from pathlib import Path

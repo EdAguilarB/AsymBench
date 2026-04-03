@@ -3,8 +3,6 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.svm import SVR
 from xgboost import XGBRegressor
 
-from asymbench.models.gnn_model import GNNWrapper
-
 
 def _set_if_missing(params: dict, key: str, value):
     """Set params[key]=value only if key not already present."""
@@ -12,7 +10,7 @@ def _set_if_missing(params: dict, key: str, value):
         params[key] = value
 
 
-def get_model(model_type, params=None, seed: int | None = None, **kwargs):
+def get_model(model_type, params=None, seed: int | None = None):
     params = dict(params or {})  # copy so we don't mutate caller
 
     if model_type == "random_forest":
