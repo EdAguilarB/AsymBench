@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 from pathlib import Path
 
 import numpy as np
@@ -111,6 +112,7 @@ class GNNExperiment:
         run_dir = self.run_store.run_dir_from_signature(signature)
 
         try:
+            self._seed_everything(self.seed)
             df_train, df_test, y_train, y_test = self._split_data()
 
             y_train_scaled = self.y_scaling.fit_transform(y_train)
@@ -153,6 +155,20 @@ class GNNExperiment:
     # Pipeline steps
     # ------------------------------------------------------------------
 
+    def _seed_everything(self, seed: int) -> None:
+        """Seed all relevant RNGs for fully reproducible runs.
+
+        Covers Python's built-in ``random``, NumPy, PyTorch (CPU and all
+        CUDA devices), and sets cuDNN to deterministic mode so convolution
+        algorithms are chosen reproducibly on GPU.
+        """
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
     def _split_data(self):
         split_by_mols = self.dataset.loc[:, self.split_by_mol_col]
         y = self.dataset.loc[:, self.target]
@@ -166,12 +182,20 @@ class GNNExperiment:
     def _make_loader(
         self, df: pd.DataFrame, y_scaled: np.ndarray, *, shuffle: bool
     ) -> DataLoader:
-        """Build a PyG DataLoader with scaled targets injected into each graph."""
+        """Build a PyG DataLoader with scaled targets injected into each graph.
+
+        When *shuffle* is ``True`` a seeded :class:`torch.Generator` is used
+        so the mini-batch order is reproducible across runs with the same seed.
+        """
         dataset = self.representation.transform(df)
         for i, data in enumerate(dataset._data):
             data.y = torch.tensor([y_scaled[i]], dtype=torch.float)
         batch_size = self.model_params.get("batch_size", 32)
-        return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+        generator = None
+        if shuffle:
+            generator = torch.Generator()
+            generator.manual_seed(self.seed)
+        return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, generator=generator)
 
     def _build_model(self) -> BaseReactionGNN:
         # Training-loop params are not forwarded to the model constructor
