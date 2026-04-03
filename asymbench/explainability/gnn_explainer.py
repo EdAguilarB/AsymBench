@@ -243,6 +243,11 @@ def _integrated_gradients(
     edge_index = data.edge_index.to(device)
     batch = torch.zeros(x.shape[0], dtype=torch.long, device=device)
 
+    # Preserve edge features so GAT / GIN architectures receive them correctly
+    edge_attr = getattr(data, "edge_attr", None)
+    if edge_attr is not None:
+        edge_attr = edge_attr.float().to(device)
+
     baseline = torch.zeros_like(x)            # all-zeros = neutral reference
     delta = x - baseline                       # [N, F]
 
@@ -252,7 +257,12 @@ def _integrated_gradients(
         alpha = step / n_steps
         x_interp = (baseline + alpha * delta).requires_grad_(True)
 
-        interp_data = Data(x=x_interp, edge_index=edge_index, batch=batch)
+        interp_data = Data(
+            x=x_interp,
+            edge_index=edge_index,
+            edge_attr=edge_attr,
+            batch=batch,
+        )
         out = model(interp_data)
 
         # Gradient of scalar output w.r.t. x_interp only — model params untouched
