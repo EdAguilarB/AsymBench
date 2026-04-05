@@ -246,6 +246,12 @@ def _integrated_gradients(
     if edge_attr is not None:
         edge_attr = edge_attr.float().to(device)
 
+    # Preserve graph-level reaction features — these are fixed (not interpolated)
+    # because IG attributes predictions to *node* features, not global conditions.
+    rxn_feats = getattr(data, "reaction_features", None)
+    if rxn_feats is not None:
+        rxn_feats = rxn_feats.float().to(device)
+
     baseline = torch.zeros_like(x)  # all-zeros = neutral reference
     delta = x - baseline  # [N, F]
 
@@ -258,6 +264,8 @@ def _integrated_gradients(
         interp_data = Data(
             x=x_interp, edge_index=edge_index, edge_attr=edge_attr, batch=batch
         )
+        if rxn_feats is not None:
+            interp_data.reaction_features = rxn_feats
         out = model(interp_data)
 
         # Gradient of scalar output w.r.t. x_interp only — model params untouched
