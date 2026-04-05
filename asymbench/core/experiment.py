@@ -30,6 +30,7 @@ class Experiment:
         cache_dir: Path = Path("experiment_runs"),
         external_test_set: pd.DataFrame | None = None,
         explainability_cfg: dict | None = None,
+        reaction_features: list[str] | None = None,
     ):
         self.dataset = dataset
         self.smiles_columns = smiles_columns
@@ -46,6 +47,7 @@ class Experiment:
         self.model_cfg = getattr(self.optimizer, "model_cfg", None)
         self.external_test_set = external_test_set
         self.explainability_cfg: dict = explainability_cfg or {}
+        self.reaction_features: list[str] = reaction_features or []
 
     def run(self):
         model_type = self.model_cfg.get("type", None)
@@ -222,7 +224,7 @@ class Experiment:
         sampler = split_cfg.get("sampler", split_cfg.get("type", "unknown"))
         train_size = split_cfg.get("train_size", None)
 
-        return {
+        sig = {
             "representation": {"type": rep_type},
             "model": {"type": model_type},
             "split": {
@@ -232,3 +234,6 @@ class Experiment:
             },
             "seed": self.seed,
         }
+        if self.reaction_features:
+            sig["reaction_features"] = sorted(self.reaction_features)
+        return sig
