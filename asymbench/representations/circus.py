@@ -72,11 +72,22 @@ class CachingCircusRepresentation:
 
     The cache dict is owned by ``BenchmarkRunner`` and shared across all
     instances that belong to the same benchmark run.
+
+    ``reaction_features`` is an optional list of numeric column names present in
+    the raw dataset DataFrame.  When provided, those columns are appended to the
+    molecular feature matrix inside ``transform()`` so that they pass through the
+    same normalisation / feature-selection pipeline as the molecular descriptors.
     """
 
-    def __init__(self, config: dict, fit_cache: dict) -> None:
+    def __init__(
+        self,
+        config: dict,
+        fit_cache: dict,
+        reaction_features: list[str] | None = None,
+    ) -> None:
         self._inner = CircusFeaturizer(config)
         self._fit_cache = fit_cache
+        self._reaction_features: list[str] = reaction_features or []
         self._cache_key_str = json.dumps(
             config["representation"], sort_keys=True
         )
@@ -104,7 +115,19 @@ class CachingCircusRepresentation:
         return self
 
     def transform(self, df: pd.DataFrame) -> pd.DataFrame:
-        return self._inner.transform(df)
+        X = self._inner.transform(df)
+        if self._reaction_features:
+            missing = [
+                c for c in self._reaction_features if c not in df.columns
+            ]
+            if missing:
+                raise ValueError(
+                    f"reaction_features not found in dataframe: {missing}"
+                )
+            X = pd.concat(
+                [X, df.loc[X.index, self._reaction_features]], axis=1
+            )
+        return X
 
     def get_metadata(self) -> dict:
         return self._inner.get_metadata()
