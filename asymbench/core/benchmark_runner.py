@@ -80,7 +80,14 @@ class BenchmarkRunner:
                 continue  # trainable representation — handled per-experiment
 
             print(f"Pre-computing representation: {rep_cfg['type']} ...")
-            self._precomputed[key] = rep.transform(full_data)
+            X = rep.transform(full_data)
+            # Embed reaction-condition columns once so that every subsequent
+            # index-lookup via PrecomputedRepresentation.transform() returns
+            # them for free — no per-experiment concatenation needed.
+            rxn_feats = self.config["dataset"].get("reaction_features", [])
+            if rxn_feats:
+                X = pd.concat([X, full_data[rxn_feats]], axis=1)
+            self._precomputed[key] = X
 
     def run(self):
         results = []
@@ -191,7 +198,11 @@ class BenchmarkRunner:
             # Trainable (e.g. CircusFeaturizer): inject the shared fit-cache so
             # the same training set is never fit() more than once.
             representation = CachingCircusRepresentation(
-                config=rep_config, fit_cache=self._circus_fit_cache
+                config=rep_config,
+                fit_cache=self._circus_fit_cache,
+                reaction_features=self.config["dataset"].get(
+                    "reaction_features", []
+                ),
             )
 
         preprocessing = FeaturePreprocessor(pre_cfg)
@@ -212,6 +223,9 @@ class BenchmarkRunner:
             cache_dir=self.config["log_dirs"]["runs"],
             external_test_set=self.external_test,
             explainability_cfg=expl_cfg,
+            reaction_features=self.config["dataset"].get(
+                "reaction_features", []
+            ),
         )
 
     def _save_results(self, results):
