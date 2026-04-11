@@ -61,7 +61,6 @@ class BenchmarkRunner:
             full_data = pd.concat([self.dataset, self.external_test])
         else:
             full_data = self.dataset
-
         for rep_cfg in self.config["representations"]:
             key = self._rep_key(rep_cfg)
             if key in self._precomputed:
@@ -166,6 +165,8 @@ class BenchmarkRunner:
             "data": self.config["dataset"],
         }
         split_strategy = MoleculeSplitter(split_cfg)
+        preprocessing = FeaturePreprocessor(pre_cfg)
+        y_scaling = TargetScaler(y_scl_cfg["scaling"])
 
         expl_cfg = expl_cfg or {"enabled": False}
 
@@ -179,12 +180,16 @@ class BenchmarkRunner:
                 split_by_mol_col=split_by_mol_col,
                 representation=representation,
                 model_cfg=model_cfg,
-                y_scl_cfg=y_scl_cfg,
+                preprocessing=preprocessing,
+                y_scaling=y_scaling,
                 split_strategy=split_strategy,
                 seed=seed,
                 cache_dir=self.config["log_dirs"]["runs"],
                 external_test_set=self.external_test,
                 explainability_cfg=expl_cfg,
+                reaction_features=self.config["dataset"].get(
+                    "reaction_features", []
+                ),
             )
 
         # --- sklearn path ---
@@ -205,8 +210,6 @@ class BenchmarkRunner:
                 ),
             )
 
-        preprocessing = FeaturePreprocessor(pre_cfg)
-        y_scaling = TargetScaler(y_scl_cfg["scaling"])
         optimizer = get_optimizer(model_cfg, seed)
 
         return Experiment(
