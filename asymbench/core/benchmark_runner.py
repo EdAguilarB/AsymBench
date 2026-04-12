@@ -20,6 +20,36 @@ _GNN_MODEL_TYPES = {"gnn"}
 _SKLEARN_INCOMPATIBLE_REPS = {"graph"}
 
 
+def _result_rep_label(rep_cfg: dict) -> str:
+    """Human-readable representation label for the results JSON.
+
+    For most representations the YAML ``type`` key is sufficient.  Two cases
+    need enrichment so that distinct configurations are not merged in analysis:
+
+    * ``hf_transformer`` — append ``model_type`` param
+      (e.g. ``"hf_transformer_chemberta"`` vs ``"hf_transformer_molt5"``)
+    * ``df_lookup`` / ``bespoke`` / ``precomputed`` — append ``feature_name``
+      param (e.g. ``"bespoke_dft_descriptors"``), mirroring the logic already
+      used in ``Experiment._run_signature()`` for cache-key differentiation.
+
+    This label is used **only** for the results JSON; it never touches run
+    directories or cache keys, which are derived from ``_run_signature()``.
+    """
+    label = rep_cfg["type"]
+    params = rep_cfg.get("params", {})
+
+    if label in ("df_lookup", "bespoke", "precomputed"):
+        feature_name = params.get("feature_name", "")
+        if feature_name:
+            label = f"{label}_{feature_name}"
+    elif label == "hf_transformer":
+        model_type = params.get("model_type", "")
+        if model_type:
+            label = f"{label}_{model_type}"
+
+    return label
+
+
 class BenchmarkRunner:
     def __init__(self, config):
         self.config = config
@@ -133,7 +163,7 @@ class BenchmarkRunner:
             metrics = exp.run()
 
             result = {
-                "representation": rep_cfg["type"],
+                "representation": _result_rep_label(rep_cfg),
                 # For GNN models, model_type in metrics is the specific
                 # architecture (gcn/gat/gin); for sklearn models it is the
                 # model class name.  Prefer that over the raw YAML "type" key
