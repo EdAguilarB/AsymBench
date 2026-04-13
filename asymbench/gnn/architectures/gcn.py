@@ -74,6 +74,7 @@ class ReactionGCN(BaseReactionGNN):
         dropout: float = 0.0,
         activation: str = "relu",
         improved: bool = False,
+        reaction_feature_dim: int = 0,
         **kwargs,  # absorb unknown YAML params gracefully
     ) -> None:
         super().__init__(
@@ -84,6 +85,7 @@ class ReactionGCN(BaseReactionGNN):
             readout_layers=readout_layers,
             dropout=dropout,
             activation=activation,
+            reaction_feature_dim=reaction_feature_dim,
         )
         self.improved = improved
 

@@ -77,6 +77,7 @@ class ReactionGAT(BaseReactionGNN):
         activation: str = "relu",
         num_heads: int = 4,
         edge_in_dim: int = EDGE_FEAT_DIM,
+        reaction_feature_dim: int = 0,
         **kwargs,
     ) -> None:
         super().__init__(
@@ -87,6 +88,7 @@ class ReactionGAT(BaseReactionGNN):
             readout_layers=readout_layers,
             dropout=dropout,
             activation=activation,
+            reaction_feature_dim=reaction_feature_dim,
         )
         self.num_heads = num_heads
         self.edge_in_dim = edge_in_dim

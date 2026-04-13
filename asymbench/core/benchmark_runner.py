@@ -1,8 +1,12 @@
+import hashlib
 import itertools
 import json
+import logging
 from pathlib import Path
 
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 from asymbench.core.experiment import Experiment
 from asymbench.core.gnn_experiment import GNNExperiment
@@ -18,6 +22,36 @@ from asymbench.representations.lookup import PrecomputedRepresentation
 
 _GNN_MODEL_TYPES = {"gnn"}
 _SKLEARN_INCOMPATIBLE_REPS = {"graph"}
+
+
+def _result_rep_label(rep_cfg: dict) -> str:
+    """Human-readable representation label for the results JSON.
+
+    For most representations the YAML ``type`` key is sufficient.  Two cases
+    need enrichment so that distinct configurations are not merged in analysis:
+
+    * ``hf_transformer`` — append ``model_type`` param
+      (e.g. ``"hf_transformer_chemberta"`` vs ``"hf_transformer_molt5"``)
+    * ``df_lookup`` / ``bespoke`` / ``precomputed`` — append ``feature_name``
+      param (e.g. ``"bespoke_dft_descriptors"``), mirroring the logic already
+      used in ``Experiment._run_signature()`` for cache-key differentiation.
+
+    This label is used **only** for the results JSON; it never touches run
+    directories or cache keys, which are derived from ``_run_signature()``.
+    """
+    label = rep_cfg["type"]
+    params = rep_cfg.get("params", {})
+
+    if label in ("df_lookup", "bespoke", "precomputed"):
+        feature_name = params.get("feature_name", "")
+        if feature_name:
+            label = f"{label}_{feature_name}"
+    elif label == "hf_transformer":
+        model_type = params.get("model_type", "")
+        if model_type:
+            label = f"{label}_{model_type}"
+
+    return label
 
 
 class BenchmarkRunner:
@@ -48,15 +82,42 @@ class BenchmarkRunner:
         """Stable JSON key for a representation config dict."""
         return json.dumps(rep_cfg, sort_keys=True)
 
+    def _rep_cache_path(self, rep_cfg: dict) -> Path:
+        """Return the CSV path for a disk-cached representation.
+
+        The filename is ``<human_label>_<hash>.csv`` where the hash covers
+        the representation config, any reaction features, and the dataset
+        path — so the cache is automatically invalidated when any of these
+        change.
+        """
+        rxn_feats = sorted(self.config["dataset"].get("reaction_features", []))
+        cache_key_str = json.dumps(
+            {
+                "rep": rep_cfg,
+                "reaction_features": rxn_feats,
+                "dataset_path": self.config["dataset"]["path"],
+            },
+            sort_keys=True,
+        )
+        hash_suffix = hashlib.md5(cache_key_str.encode()).hexdigest()[:8]
+        label = _result_rep_label(rep_cfg)
+        cache_dir = (
+            Path(self.config["log_dirs"]["benchmark"]) / "representations"
+        )
+        return cache_dir / f"{label}_{hash_suffix}.csv"
+
     def _precompute_fit_free_representations(self) -> None:
         """Compute features for all fit-free representations once on the full dataset.
 
         Representations that expose a ``fit()`` method (e.g. CircusFeaturizer)
         require a training set and are skipped here — they are handled
         per-experiment via ``CachingCircusRepresentation``.
+
+        Each computed matrix is persisted to a CSV file under
+        ``log_dirs.benchmark/representations/`` so that subsequent runs can
+        skip the (potentially expensive) featurization and load from disk
+        instead.
         """
-        # Combine training data and external test so that
-        # PrecomputedRepresentation.transform() works for any split.
         if self.external_test is not None:
             full_data = pd.concat([self.dataset, self.external_test])
         else:
@@ -65,22 +126,47 @@ class BenchmarkRunner:
         for rep_cfg in self.config["representations"]:
             key = self._rep_key(rep_cfg)
             if key in self._precomputed:
-                continue  # already computed (e.g. duplicate config entries)
+                continue  # already loaded this run (e.g. duplicate config entries)
 
+            if rep_cfg.get("type") == "graph":
+                continue  # graph reps are built per-split inside GNNExperiment
+
+            # ── Disk-cache check FIRST ────────────────────────────────────
+            # This must happen before get_representation() so that heavy
+            # featurizers (Unimol, HF transformers) never load their model
+            # or generate conformers when the result is already on disk.
+            disk_path = self._rep_cache_path(rep_cfg)
+            if disk_path.exists():
+                logger.info(
+                    "Loading cached representation from disk: %s",
+                    disk_path.name,
+                )
+                self._precomputed[key] = pd.read_csv(disk_path, index_col=0)
+                continue
+
+            # ── Not cached — instantiate, check trainability, compute ─────
             rep_config = {
                 "representation": rep_cfg,
                 "data": self.config["dataset"],
             }
             rep = get_representation(rep_config)
 
-            if rep_cfg.get("type") == "graph":
-                continue  # graph reps are built per-split inside GNNExperiment
-
             if hasattr(rep, "fit"):
                 continue  # trainable representation — handled per-experiment
 
-            print(f"Pre-computing representation: {rep_cfg['type']} ...")
-            self._precomputed[key] = rep.transform(full_data)
+            logger.info(
+                "Pre-computing representation: %s ...", rep_cfg["type"]
+            )
+            X = rep.transform(full_data)
+            # Embed reaction-condition columns so index-lookups return them
+            # for free — no per-experiment concatenation needed.
+            rxn_feats = self.config["dataset"].get("reaction_features", [])
+            if rxn_feats:
+                X = pd.concat([X, full_data[rxn_feats]], axis=1)
+            disk_path.parent.mkdir(parents=True, exist_ok=True)
+            X.to_csv(disk_path)
+            logger.info("Representation cached to disk: %s", disk_path.name)
+            self._precomputed[key] = X
 
     def run(self):
         results = []
@@ -127,7 +213,7 @@ class BenchmarkRunner:
             metrics = exp.run()
 
             result = {
-                "representation": rep_cfg["type"],
+                "representation": _result_rep_label(rep_cfg),
                 # For GNN models, model_type in metrics is the specific
                 # architecture (gcn/gat/gin); for sklearn models it is the
                 # model class name.  Prefer that over the raw YAML "type" key
@@ -159,6 +245,8 @@ class BenchmarkRunner:
             "data": self.config["dataset"],
         }
         split_strategy = MoleculeSplitter(split_cfg)
+        preprocessing = FeaturePreprocessor(pre_cfg)
+        y_scaling = TargetScaler(y_scl_cfg["scaling"])
 
         expl_cfg = expl_cfg or {"enabled": False}
 
@@ -172,12 +260,16 @@ class BenchmarkRunner:
                 split_by_mol_col=split_by_mol_col,
                 representation=representation,
                 model_cfg=model_cfg,
-                y_scl_cfg=y_scl_cfg,
+                preprocessing=preprocessing,
+                y_scaling=y_scaling,
                 split_strategy=split_strategy,
                 seed=seed,
                 cache_dir=self.config["log_dirs"]["runs"],
                 external_test_set=self.external_test,
                 explainability_cfg=expl_cfg,
+                reaction_features=self.config["dataset"].get(
+                    "reaction_features", []
+                ),
             )
 
         # --- sklearn path ---
@@ -191,11 +283,13 @@ class BenchmarkRunner:
             # Trainable (e.g. CircusFeaturizer): inject the shared fit-cache so
             # the same training set is never fit() more than once.
             representation = CachingCircusRepresentation(
-                config=rep_config, fit_cache=self._circus_fit_cache
+                config=rep_config,
+                fit_cache=self._circus_fit_cache,
+                reaction_features=self.config["dataset"].get(
+                    "reaction_features", []
+                ),
             )
 
-        preprocessing = FeaturePreprocessor(pre_cfg)
-        y_scaling = TargetScaler(y_scl_cfg["scaling"])
         optimizer = get_optimizer(model_cfg, seed)
 
         return Experiment(
@@ -212,6 +306,9 @@ class BenchmarkRunner:
             cache_dir=self.config["log_dirs"]["runs"],
             external_test_set=self.external_test,
             explainability_cfg=expl_cfg,
+            reaction_features=self.config["dataset"].get(
+                "reaction_features", []
+            ),
         )
 
     def _save_results(self, results):

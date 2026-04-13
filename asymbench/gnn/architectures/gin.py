@@ -85,6 +85,7 @@ class ReactionGIN(BaseReactionGNN):
         activation: str = "relu",
         train_eps: bool = False,
         edge_in_dim: int = EDGE_FEAT_DIM,
+        reaction_feature_dim: int = 0,
         **kwargs,
     ) -> None:
         super().__init__(
@@ -95,6 +96,7 @@ class ReactionGIN(BaseReactionGNN):
             readout_layers=readout_layers,
             dropout=dropout,
             activation=activation,
+            reaction_feature_dim=reaction_feature_dim,
         )
         self.train_eps = train_eps
         self.edge_in_dim = edge_in_dim
