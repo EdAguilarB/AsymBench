@@ -25,20 +25,27 @@ _SKLEARN_INCOMPATIBLE_REPS = {"graph"}
 
 
 def _result_rep_label(rep_cfg: dict) -> str:
-    """Human-readable representation label for the results JSON.
+    """Return the human-readable label for a representation config.
 
-    For most representations the YAML ``type`` key is sufficient.  Two cases
-    need enrichment so that distinct configurations are not merged in analysis:
+    Priority:
+      1. ``rep_cfg["name"]`` — user-supplied override (free-form string).
+         Allows distinct configs of the same ``type`` to be told apart in
+         results, logs, cache filenames, and run directory paths.
+      2. Auto-label from ``type`` + key params (existing fallback logic):
+         * ``hf_transformer`` — append ``model_type``
+           (e.g. ``"hf_transformer_chemberta"``)
+         * ``df_lookup`` / ``bespoke`` / ``precomputed`` — append
+           ``feature_name`` (e.g. ``"bespoke_v1"``)
+         * All other types — use ``type`` as-is (e.g. ``"morgan"``)
 
-    * ``hf_transformer`` — append ``model_type`` param
-      (e.g. ``"hf_transformer_chemberta"`` vs ``"hf_transformer_molt5"``)
-    * ``df_lookup`` / ``bespoke`` / ``precomputed`` — append ``feature_name``
-      param (e.g. ``"bespoke_dft_descriptors"``), mirroring the logic already
-      used in ``Experiment._run_signature()`` for cache-key differentiation.
-
-    This label is used **only** for the results JSON; it never touches run
-    directories or cache keys, which are derived from ``_run_signature()``.
+    This label is the single source of truth used in:
+      - results JSON (``"representation"`` key)
+      - disk-cache filenames under ``log_dirs.benchmark/representations/``
+      - run directory paths (via ``_run_signature()``)
     """
+    if rep_cfg.get("name"):
+        return rep_cfg["name"]
+
     label = rep_cfg["type"]
     params = rep_cfg.get("params", {})
 
@@ -65,6 +72,11 @@ class BenchmarkRunner:
         else:
             self.external_test = None
 
+        # Validate that no two representation configs resolve to the same label.
+        # This catches both missing ``name:`` fields on duplicate-type configs
+        # and accidental name collisions — before any expensive work begins.
+        self._validate_rep_labels()
+
         # Pre-compute fit-free representations on the full dataset so that
         # each experiment only does an O(n) index lookup instead of re-running
         # (potentially expensive) featurization from scratch.
@@ -78,29 +90,56 @@ class BenchmarkRunner:
     # Representation pre-computation helpers
     # ------------------------------------------------------------------
 
+    def _validate_rep_labels(self) -> None:
+        """Raise ``ValueError`` if any two rep configs resolve to the same label.
+
+        Checked at startup so the user gets a clear error before any
+        expensive computation begins.  Works for both auto-generated labels
+        and user-supplied ``name:`` values.
+        """
+        seen: dict[str, dict] = {}
+        for rep_cfg in self.config["representations"]:
+            label = _result_rep_label(rep_cfg)
+            if label in seen:
+                raise ValueError(
+                    f"Two representation configs resolve to the same label "
+                    f"'{label}'. Add a unique 'name:' field to each one.\n"
+                    f"  First:  {seen[label]}\n"
+                    f"  Second: {rep_cfg}"
+                )
+            seen[label] = rep_cfg
+
     def _rep_key(self, rep_cfg: dict) -> str:
-        """Stable JSON key for a representation config dict."""
-        return json.dumps(rep_cfg, sort_keys=True)
+        """Stable JSON key for a representation config dict.
+
+        The ``name`` field is intentionally excluded: two configs that differ
+        only by name represent the same featurization and must share cached
+        in-memory features.
+        """
+        key_cfg = {k: v for k, v in rep_cfg.items() if k != "name"}
+        return json.dumps(key_cfg, sort_keys=True)
 
     def _rep_cache_path(self, rep_cfg: dict) -> Path:
         """Return the CSV path for a disk-cached representation.
 
         The filename is ``<human_label>_<hash>.csv`` where the hash covers
-        the representation config, any reaction features, and the dataset
-        path — so the cache is automatically invalidated when any of these
-        change.
+        ``type`` + ``params`` + reaction features + dataset path.  The
+        ``name`` field is **excluded** from the hash so that renaming a
+        representation does not invalidate its on-disk feature cache.
         """
         rxn_feats = sorted(self.config["dataset"].get("reaction_features", []))
+        # Exclude 'name' so renames don't bust the on-disk cache
+        rep_for_hash = {k: v for k, v in rep_cfg.items() if k != "name"}
         cache_key_str = json.dumps(
             {
-                "rep": rep_cfg,
+                "rep": rep_for_hash,
                 "reaction_features": rxn_feats,
                 "dataset_path": self.config["dataset"]["path"],
             },
             sort_keys=True,
         )
         hash_suffix = hashlib.md5(cache_key_str.encode()).hexdigest()[:8]
-        label = _result_rep_label(rep_cfg)
+        label = _result_rep_label(rep_cfg)  # uses name if present
         cache_dir = (
             Path(self.config["log_dirs"]["benchmark"]) / "representations"
         )
@@ -155,7 +194,8 @@ class BenchmarkRunner:
                 continue  # trainable representation — handled per-experiment
 
             logger.info(
-                "Pre-computing representation: %s ...", rep_cfg["type"]
+                "Pre-computing representation: %s ...",
+                _result_rep_label(rep_cfg),
             )
             X = rep.transform(full_data)
             # Embed reaction-condition columns so index-lookups return them
@@ -250,6 +290,10 @@ class BenchmarkRunner:
 
         expl_cfg = expl_cfg or {"enabled": False}
 
+        # Resolve the label once here — passed to both experiment types so
+        # that run directory paths and results JSON are always consistent.
+        rep_label = _result_rep_label(rep_cfg)
+
         # --- GNN path ---
         if rep_cfg.get("type") == "graph":
             representation = GraphRepresentation(rep_config)
@@ -270,6 +314,7 @@ class BenchmarkRunner:
                 reaction_features=self.config["dataset"].get(
                     "reaction_features", []
                 ),
+                rep_label=rep_label,
             )
 
         # --- sklearn path ---
@@ -309,6 +354,7 @@ class BenchmarkRunner:
             reaction_features=self.config["dataset"].get(
                 "reaction_features", []
             ),
+            rep_label=rep_label,
         )
 
     def _save_results(self, results):

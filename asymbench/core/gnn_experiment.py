@@ -81,6 +81,7 @@ class GNNExperiment:
         external_test_set: pd.DataFrame | None = None,
         explainability_cfg: dict | None = None,
         reaction_features: list[str] | None = None,
+        rep_label: str | None = None,
     ) -> None:
         self.dataset = dataset
         self.smiles_columns = smiles_columns
@@ -101,6 +102,10 @@ class GNNExperiment:
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
         )
+        # User-supplied (or BenchmarkRunner-resolved) label for this
+        # representation.  When set, it is used in _run_signature() so that
+        # run directory paths match the label shown in the results JSON.
+        self.rep_label: str | None = rep_label
 
     # ------------------------------------------------------------------
     # Public entry point
@@ -394,9 +399,12 @@ class GNNExperiment:
         )
 
     def _run_signature(self) -> dict:
+        # Use the resolved label from BenchmarkRunner when available;
+        # fall back to "graph" (the existing hardcoded value) otherwise.
+        rep_type = self.rep_label if self.rep_label is not None else "graph"
         split_cfg = getattr(self.split_strategy, "config", {})
         sig = {
-            "representation": {"type": "graph"},
+            "representation": {"type": rep_type},
             "model": {"type": self.arch_label},
             "split": {
                 "sampler": split_cfg.get("sampler", "unknown"),
