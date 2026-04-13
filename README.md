@@ -183,6 +183,7 @@ Rules:
 - The SMILES columns are listed in `smiles_columns` in the YAML config
 - All SMILES columns listed there are used to build the graph representation; other columns are ignored
 - For **bespoke / precomputed representations**, a separate CSV or Parquet file may be provided containing pre-computed numerical features indexed by the same ID column
+- **Reaction/experimental variables** (temperature, time, concentration, etc.) can be kept as additional numeric columns in the same CSV and referenced via `reaction_features` in the YAML config (see below)
 
 ### Bespoke features CSV
 
@@ -244,6 +245,9 @@ dataset:
     - solvent_smiles
   target: ddG                            # numeric regression target column
   id_col: Example                        # unique row identifier column
+  reaction_features:                     # optional: numeric columns to append to
+    - temperature                        # molecular features before normalisation
+    - reaction_time                      # (traditional ML only; omit if unused)
 
 # Optional external hold-out set — used with sampler: external
 external_test_set:
