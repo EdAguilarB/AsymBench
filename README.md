@@ -56,13 +56,14 @@ The framework automatically performs:
    - [splits](#splits)
    - [explainability](#explainability)
    - [log_dirs](#log_dirs)
-6. [Graph Neural Networks](#graph-neural-networks)
-7. [Explainability](#explainability-1)
-8. [GPU Setup](#gpu-setup)
-9. [Output Files](#output-files)
-10. [Run Caching and Reproducibility](#run-caching-and-reproducibility)
-11. [Extending the Framework](#extending-the-framework)
-12. [Citation / License / Contact](#citation)
+6. [Representation Names](#representation-names)
+7. [Graph Neural Networks](#graph-neural-networks)
+8. [Explainability](#explainability-1)
+9. [GPU Setup](#gpu-setup)
+10. [Output Files](#output-files)
+11. [Run Caching and Reproducibility](#run-caching-and-reproducibility)
+12. [Extending the Framework](#extending-the-framework)
+13. [Citation / License / Contact](#citation)
 
 ---
 
@@ -197,6 +198,8 @@ id,steric_param,hammett_sigma,solvent_dielectric,...
 
 The `index_col` key tells AsymBench which column to use as the join key (must match `id_col` in the main dataset).
 
+**All-columns mode:** If your bespoke CSV contains only the identifier column plus feature columns (no other metadata), you can omit `feature_columns` entirely and AsymBench will use every remaining column as a feature automatically. See [Representation Names → Bespoke / precomputed features](#bespokepre-computed--df_lookup) for full details and examples.
+
 ---
 
 ## Quick Start
@@ -266,6 +269,9 @@ external_test_set:
 # representations × all models automatically.
 # GNN models (type: gnn) only run with type: graph.
 # All other models only run with non-graph representations.
+#
+# NAMING: every representation entry accepts an optional "name:"
+# field (see "Representation Names" section for details).
 # ─────────────────────────────────────────────────────────────
 representations:
 
@@ -279,6 +285,14 @@ representations:
     params:
       radius: 2
       n_bits: 2048
+    name: morgan_2048            # optional label (required when using
+                                 # multiple configs of the same type)
+
+  - type: morgan
+    params:
+      radius: 2
+      n_bits: 1024
+    name: morgan_1024
 
   # ── RDKit 2D descriptors ───────────────────────────────────
   - type: rdkit
@@ -295,10 +309,12 @@ representations:
       model_name: DeepChem/ChemBERTa-77M-MLM        # HF model identifier
       pooling: mean                                 # mean | cls
       device: cpu                                   # cpu | cuda
+    name: ChemBERTa-77M-MLM
 
   - type: hf_transformer
     params:
       model_type: molt5
+    name: MolT5
 
   # ── UniMol 3D embeddings ───────────────────────────────────
   - type: unimol
@@ -308,17 +324,29 @@ representations:
       remove_hs: false
 
   # ── Bespoke / precomputed features ────────────────────────
+  # Option A: explicit column list
   - type: bespoke                   # also accepted: precomputed | df_lookup
     params:
       features_path: data/my_reaction/bespoke_features.csv
       feature_name: v1              # label used in output filenames
       index_col: Example            # column in features CSV matching id_col
-      feature_columns:              # which columns to use (omit = use all)
+      feature_columns:              # explicit list of columns to use
         - steric_param
         - hammett_sigma
         - solvent_dielectric
-      prefix: Bespoke               # optional prefix for column names
+      prefix: bespoke               # prepended to column names as "bespoke__<col>"
+                                    # omit or set to ~ for no prefix
       strict: true                  # raise error if index mismatch
+    name: bespoke_v1
+
+  # Option B: all-columns mode — feature_columns omitted
+  - type: bespoke
+    params:
+      features_path: data/my_reaction/all_features.csv
+      feature_name: all
+      index_col: Example            # identifier column; all other cols = features
+      strict: true
+    name: bespoke_all
 
 
 # ─────────────────────────────────────────────────────────────
@@ -556,6 +584,128 @@ log_dirs:
 
 ---
 
+## Representation Names
+
+Every representation entry in the YAML supports an optional **`name:` field** that provides a free-form human-readable label used consistently across:
+
+- The `"representation"` key in `raw_results.json`
+- On-disk feature cache filenames (`benchmark/representations/<name>_<hash>.csv`)
+- Run directory paths (`runs/<name>/…`)
+- All log messages
+
+### Why you need it
+
+When two representations share the same `type`, the framework cannot tell them apart without a `name`. For example, two Morgan fingerprints with different bit sizes both auto-label as `"morgan"`, so the second result would silently overwrite the first in the results file. Adding `name:` fixes this:
+
+```yaml
+representations:
+  - type: morgan
+    params:
+      radius: 2
+      n_bits: 2048
+    name: morgan_2048    # ← results stored as "morgan_2048"
+
+  - type: morgan
+    params:
+      radius: 2
+      n_bits: 1024
+    name: morgan_1024    # ← results stored as "morgan_1024"
+```
+
+Similarly for transformer models:
+
+```yaml
+  - type: hf_transformer
+    params:
+      model_type: chemberta
+      model_name: DeepChem/ChemBERTa-77M-MLM
+      pooling: mean
+      device: cpu
+    name: ChemBERTa-77M-MLM
+
+  - type: hf_transformer
+    params:
+      model_type: chemberta
+      model_name: DeepChem/ChemBERTa-100M-MLM
+      pooling: mean
+      device: cpu
+    name: ChemBERTa-100M-MLM
+```
+
+### Rules
+
+| Rule | Detail |
+|------|--------|
+| **Optional** | Omitting `name:` is fine for representation types that appear only once — the framework derives an auto-label from `type` and key params (e.g. `hf_transformer_chemberta`, `bespoke_v1`) |
+| **Required when duplicates exist** | If two representations resolve to the same auto-label, AsymBench raises a `ValueError` at startup before any computation begins |
+| **Must be unique** | All resolved labels (user-supplied or auto-generated) must be distinct across the entire `representations` list |
+| **Rename-safe caching** | Changing a `name:` does **not** invalidate the on-disk feature cache — only `type`, `params`, and the dataset path affect the cache hash |
+
+### Auto-label fallback (no `name:` provided)
+
+| Representation type | Auto-label |
+|---------------------|------------|
+| `morgan`, `rdkit`, `circus`, `unimol`, `graph` | `<type>` (e.g. `morgan`) |
+| `hf_transformer` | `hf_transformer_<model_type>` (e.g. `hf_transformer_chemberta`) |
+| `bespoke`, `df_lookup`, `precomputed` | `<type>_<feature_name>` (e.g. `bespoke_v1`) |
+
+---
+
+## Bespoke / Pre-computed features (`bespoke`, `precomputed`, `df_lookup`)
+
+These representation types load numerical features from an external CSV or Parquet file and join them to the main dataset by a shared index column.
+
+### Explicit column list (selective features)
+
+Specify exactly which columns to use as features. All other columns in the file are ignored:
+
+```yaml
+- type: bespoke
+  params:
+    features_path: data/features.csv
+    feature_name: v1
+    index_col: Example
+    feature_columns:
+      - steric_param
+      - hammett_sigma
+      - solvent_dielectric
+    prefix: bespoke    # columns renamed to "bespoke__steric_param", etc.
+    strict: true
+  name: bespoke_v1
+```
+
+### All-columns mode (use every feature in the file)
+
+When your CSV contains only the identifier column and feature columns — with no other metadata mixed in — you can omit `feature_columns` entirely. AsymBench will use **all remaining columns** as features after the index is set:
+
+```yaml
+- type: bespoke
+  params:
+    features_path: data/all_features.csv
+    feature_name: all
+    index_col: Example   # identifier column — all other columns become features
+    strict: true
+  name: bespoke_all
+```
+
+This avoids having to enumerate every column name manually when the file is feature-only.
+
+> **Note:** If any of the auto-detected columns are non-numeric, AsymBench logs a warning listing them. The run still proceeds — it is your responsibility to ensure the file contains only meaningful numerical features in all-columns mode.
+
+### Parameter reference
+
+| Parameter | Required | Default | Description |
+|-----------|----------|---------|-------------|
+| `features_path` | ✓ | — | Path to the `.csv` or `.parquet` features file |
+| `index_col` | — | `None` | Column to use as the row index (join key); if omitted the file must already have a named index |
+| `feature_name` | — | — | Short label appended to the auto-label (e.g. `bespoke_v1`); not needed when `name:` is set on the entry |
+| `feature_columns` | — | `None` (all columns) | Explicit list of columns to use; omit for all-columns mode |
+| `prefix` | — | `""` (no prefix) | String prepended to every column name as `<prefix>__<col>`. Set to `~` or omit to keep original names |
+| `join_key` | — | `None` | Dataset column to use for lookup instead of `df.index` |
+| `strict` | — | `True` | Raise an error if any reaction index is absent from the features file; set to `false` to fill missing rows with zeros |
+
+---
+
 ## Graph Neural Networks
 
 ### How the graph representation works
@@ -665,21 +815,34 @@ params:
 
 ### Per-run directory (`log_dirs.runs/…`)
 
+Run directories are named after the **resolved representation label** (user-supplied `name:` or auto-label):
+
 ```
 runs/
-└── rep=graph__model=gat__sampler=scaffold__train=0.8__mol=substrate_smiles__seed=2/
-    ├── predictions.csv          # train + test rows with true and predicted target
-    ├── parity_test.png          # parity plot for the test set
-    ├── metrics.json             # RMSE, MAE, R², run metadata
-    └── explainability/
-        ├── train/
-        │   ├── node_masks.npz
-        │   ├── fragment_importances.csv
-        │   └── fragment_beeswarm.png
-        └── test/
-            ├── node_masks.npz
-            ├── fragment_importances.csv
-            └── fragment_beeswarm.png
+└── morgan_2048/
+│   └── random_forest/random/train_0p80/seed_0/
+│       ├── predictions.csv
+│       ├── parity_test.png
+│       └── metrics.json
+└── morgan_1024/
+│   └── random_forest/random/train_0p80/seed_0/
+│       ├── predictions.csv
+│       ├── parity_test.png
+│       └── metrics.json
+└── graph/
+    └── gcn/scaffold/train_0p80/seed_2/
+        ├── predictions.csv
+        ├── parity_test.png
+        ├── metrics.json
+        └── explainability/
+            ├── train/
+            │   ├── node_masks.npz
+            │   ├── fragment_importances.csv
+            │   └── fragment_beeswarm.png
+            └── test/
+                ├── node_masks.npz
+                ├── fragment_importances.csv
+                └── fragment_beeswarm.png
 ```
 
 For traditional ML the `explainability/` folder contains SHAP files instead:
@@ -691,6 +854,21 @@ For traditional ML the `explainability/` folder contains SHAP files instead:
             └── test_shap_summary_beeswarm.png
 ```
 
+### Feature cache directory (`log_dirs.benchmark/representations/…`)
+
+Fit-free representations (all except `circus`) are precomputed once on the full dataset and saved to disk so subsequent runs can skip featurization:
+
+```
+benchmark/
+└── representations/
+    ├── morgan_2048_a1b2c3d4.csv   # <name>_<hash>.csv
+    ├── morgan_1024_e5f6a7b8.csv
+    ├── bespoke_v1_c9d0e1f2.csv
+    └── ChemBERTa-77M-MLM_g3h4i5j6.csv
+```
+
+The hash covers `type` + `params` + dataset path only. **Renaming a representation (changing `name:`) never invalidates its cache file** — only changes to `params` or the dataset path do.
+
 ### Benchmark directory (`log_dirs.benchmark/…`)
 
 ```
@@ -698,18 +876,19 @@ benchmark/
 └── raw_results.json    # aggregated metrics for every run in the experiment
 ```
 
-Each entry in `raw_results.json`:
+Each entry in `raw_results.json` uses the resolved label in the `"representation"` field:
+
 ```json
 {
-  "representation": "graph",
-  "model": "gat",
+  "representation": "morgan_2048",
+  "model": "random_forest",
   "split": "scaffold",
   "seed": 2,
   "rmse": 0.84,
   "mae": 0.61,
   "r2": 0.91,
-  "model_type": "gat",
-  "rep_type": "graph",
+  "model_type": "random_forest",
+  "rep_type": "morgan",
   "split_sampler": "scaffold",
   "train_size": 0.8,
   "cache_hit": false
@@ -721,7 +900,7 @@ Each entry in `raw_results.json`:
 ## Run Caching and Reproducibility
 
 Each run is uniquely identified by a **signature** built from:
-- Representation type + params
+- Representation label (user-supplied `name:` or auto-label)
 - Model architecture + type
 - Split sampler + train size + split column
 - Random seed
@@ -731,6 +910,8 @@ If a run with an identical signature has already completed, its metrics are load
 - Resuming interrupted benchmarks without data loss
 - Adding new representations or models to an existing benchmark without rerunning everything
 - Parallel execution across machines (shared network filesystem)
+
+> **Tip:** Because the run signature uses the resolved label rather than the raw `type`, adding a `name:` to an existing representation that previously had no name will change its signature and cause those runs to be treated as new (not cached). If you are continuing an existing benchmark, keep labels consistent with what was used before.
 
 ---
 

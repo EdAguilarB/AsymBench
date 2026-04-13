@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
 from asymbench.representations.base import BaseRepresentation
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -25,15 +28,46 @@ class DataFrameLookupRepresentation(BaseRepresentation):
     config["representation"]["params"] must include:
       - "features_path": path to CSV/Parquet with descriptors
       - one of:
-          * "index_col": column in features file to use as index (if not already indexed)
-          * OR features file already has an index saved (parquet typically does)
+          * "index_col": column in features file to use as index (if not
+            already indexed)
+          * OR features file already has an index saved (parquet typically
+            does)
       - Optional:
-          * "feature_columns": list of columns to use (default: all non-index columns)
-          * "prefix": prefix added to all feature names (default: "bespoke")
-          * "join_key": dataset column to use for lookup instead of df.index (default: None)
-              - If join_key is provided, we match on df[join_key] values.
-              - If not provided, we match on df.index.
-          * "strict": bool, if True raise when any keys missing (default True)
+          * "feature_columns": explicit list of columns to use as features.
+            When omitted (or set to null/~), **all columns** in the file
+            are used after the index column has been set.  Use this mode
+            when the CSV contains only an identifier column and feature
+            columns with no other metadata mixed in.
+          * "prefix": string prepended to every feature column name as
+            ``<prefix>__<col>`` to avoid clashes with other representations.
+            Set to null/~ or omit entirely to keep the original column
+            names unchanged.  (default: no prefix)
+          * "join_key": dataset column to use for lookup instead of
+            df.index (default: None — match on df.index)
+          * "strict": bool, if True raise when any keys are missing from
+            the features table (default: True)
+
+    Examples
+    --------
+    Use a hand-picked subset of columns::
+
+        type: bespoke
+        params:
+          features_path: data/features.csv
+          feature_name: v1
+          index_col: Example
+          feature_columns: [col_a, col_b, col_c]
+          prefix: bespoke
+          strict: true
+
+    Use every column in the file (identifier-only CSV)::
+
+        type: bespoke
+        params:
+          features_path: data/all_features.csv
+          feature_name: all
+          index_col: Example
+          strict: true
     """
 
     def __post_init__(self) -> None:
@@ -41,11 +75,14 @@ class DataFrameLookupRepresentation(BaseRepresentation):
 
         params = self.rep_params
         self.features_path = Path(params["features_path"])
-        self.index_col = params.get("index_col", None)
-        self.feature_columns = params.get("feature_columns", None)
-        self.prefix = params.get("prefix", "bespoke")
-        self.join_key = params.get("join_key", None)
-        self.strict = bool(params.get("strict", True))
+        self.index_col: Optional[str] = params.get("index_col", None)
+        self.feature_columns: Optional[List[str]] = params.get(
+            "feature_columns", None
+        )
+        # None / empty string → no prefix; any other string → "<prefix>__<col>"
+        self.prefix: str = params.get("prefix") or ""
+        self.join_key: Optional[str] = params.get("join_key", None)
+        self.strict: bool = bool(params.get("strict", True))
 
         self._features = self._load_features()
 
@@ -61,8 +98,9 @@ class DataFrameLookupRepresentation(BaseRepresentation):
                 f"Features index is not unique. Example duplicate keys: {dupes}"
             )
 
-        # keep only requested columns
+        # ── Column selection ─────────────────────────────────────────────
         if self.feature_columns is not None:
+            # Explicit list — validate and filter
             missing = [
                 c
                 for c in self.feature_columns
@@ -70,14 +108,45 @@ class DataFrameLookupRepresentation(BaseRepresentation):
             ]
             if missing:
                 raise KeyError(
-                    f"Requested feature_columns not found in features table: {missing[:5]}"
+                    f"Requested feature_columns not found in features table: "
+                    f"{missing[:5]}"
                 )
             self._features = self._features.loc[:, self.feature_columns]
+            logger.info(
+                "Loaded %d explicitly specified feature column(s) from '%s'.",
+                len(self._features.columns),
+                self.features_path.name,
+            )
+        else:
+            # No explicit list — use every column remaining after indexing
+            non_numeric = [
+                c
+                for c in self._features.columns
+                if not pd.api.types.is_numeric_dtype(self._features[c])
+            ]
+            if non_numeric:
+                logger.warning(
+                    "feature_columns was not specified for '%s'; using all "
+                    "%d columns, but %d appear non-numeric and may cause "
+                    "issues downstream: %s",
+                    self.features_path.name,
+                    len(self._features.columns),
+                    len(non_numeric),
+                    non_numeric[:10],
+                )
+            else:
+                logger.info(
+                    "feature_columns not specified; using all %d numeric "
+                    "column(s) from '%s'.",
+                    len(self._features.columns),
+                    self.features_path.name,
+                )
 
-        # prefix column names to avoid collisions with other reps / metadata
-        self._features.columns = [
-            f"{self.prefix}__{c}" for c in self._features.columns
-        ]
+        # ── Optional prefix ──────────────────────────────────────────────
+        if self.prefix:
+            self._features.columns = [
+                f"{self.prefix}__{c}" for c in self._features.columns
+            ]
 
     def _load_features(self) -> pd.DataFrame:
         if not self.features_path.exists():
@@ -152,12 +221,15 @@ class DataFrameLookupRepresentation(BaseRepresentation):
             "params": {
                 "features_path": str(self.features_path),
                 "index_col": self.index_col,
+                # None means "all columns" — preserve the original intent
                 "feature_columns": self.feature_columns,
-                "prefix": self.prefix,
+                # Empty string means "no prefix" — store None for clarity
+                "prefix": self.prefix or None,
                 "join_key": self.join_key,
                 "strict": self.strict,
             },
             "n_features": int(self._features.shape[1]),
+            "using_all_columns": self.feature_columns is None,
         }
 
 
