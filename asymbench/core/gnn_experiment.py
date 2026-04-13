@@ -13,6 +13,7 @@ from asymbench.evaluation.metrics import evaluate_predictions
 from asymbench.gnn.architectures import BaseReactionGNN, build_reaction_gnn
 from asymbench.gnn.featurizer import NODE_FEAT_DIM
 from asymbench.gnn.trainer import predict, train_epoch
+from asymbench.preprocessing.feature_preprocessor import FeaturePreprocessor
 from asymbench.preprocessing.targets_scaler import TargetScaler
 from asymbench.utils.run_store import RunStore
 from asymbench.visualization.parity import make_parity_plot
@@ -72,12 +73,14 @@ class GNNExperiment:
         split_by_mol_col: str,
         representation,
         model_cfg: dict,
-        y_scl_cfg: dict,
+        preprocessing: FeaturePreprocessor,
+        y_scaling: TargetScaler,
         split_strategy: MoleculeSplitter,
         seed: int,
         cache_dir: Path = Path("experiment_runs"),
         external_test_set: pd.DataFrame | None = None,
         explainability_cfg: dict | None = None,
+        reaction_features: list[str] | None = None,
     ) -> None:
         self.dataset = dataset
         self.smiles_columns = smiles_columns
@@ -86,13 +89,15 @@ class GNNExperiment:
         self.representation = representation
         self.model_cfg = model_cfg
         self.model_params: dict = dict(model_cfg.get("params", {}))
-        self.y_scaling = TargetScaler(y_scl_cfg.get("scaling", "none"))
+        self.y_scaling = y_scaling
         self.split_strategy = split_strategy
         self.seed = seed
         self.cache_dir = Path(cache_dir)
         self.run_store = RunStore(base_dir=self.cache_dir)
         self.external_test_set = external_test_set
         self.explainability_cfg: dict = explainability_cfg or {}
+        self.reaction_features: list[str] = reaction_features or []
+        self.preprocessing: FeaturePreprocessor | None = preprocessing
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
         )
@@ -120,14 +125,37 @@ class GNNExperiment:
             y_train_scaled = self.y_scaling.fit_transform(y_train)
             y_test_scaled = self.y_scaling.transform(y_test)
 
+            # Scale reaction-condition features with the same FeaturePreprocessor
+            # used by the traditional-ML path, so scaling method and feature
+            # filters are fully consistent across experiment types.
+            # The preprocessor is fit on train only; the resulting column count
+            # may be smaller than len(reaction_features) when the variance or
+            # correlation filter drops columns — so we read n_rxn from the
+            # output shape and use it to size the model readout MLP.
+            rxn_train_scaled = rxn_test_scaled = None
+            n_rxn = 0
+            if self.reaction_features:
+                if self.preprocessing is None:
+                    raise ValueError(
+                        "A FeaturePreprocessor must be provided when reaction_features "
+                        "are used so that the correct scaling method is applied."
+                    )
+                rxn_train_scaled = self.preprocessing.fit_transform(
+                    df_train[self.reaction_features]
+                ).to_numpy(dtype=float)
+                rxn_test_scaled = self.preprocessing.transform(
+                    df_test[self.reaction_features]
+                ).to_numpy(dtype=float)
+                n_rxn = rxn_train_scaled.shape[1]
+
             train_loader = self._make_loader(
-                df_train, y_train_scaled, shuffle=True
+                df_train, y_train_scaled, rxn_train_scaled, shuffle=True
             )
             test_loader = self._make_loader(
-                df_test, y_test_scaled, shuffle=False
+                df_test, y_test_scaled, rxn_test_scaled, shuffle=False
             )
 
-            model = self._build_model()
+            model = self._build_model(reaction_feature_dim=n_rxn)
             self._train(model, train_loader)
 
             if self.explainability_cfg.get("enabled", False):
@@ -190,16 +218,33 @@ class GNNExperiment:
         )
 
     def _make_loader(
-        self, df: pd.DataFrame, y_scaled: np.ndarray, *, shuffle: bool
+        self,
+        df: pd.DataFrame,
+        y_scaled: np.ndarray,
+        rxn_scaled: np.ndarray | None = None,
+        *,
+        shuffle: bool,
     ) -> DataLoader:
         """Build a PyG DataLoader with scaled targets injected into each graph.
 
         When *shuffle* is ``True`` a seeded :class:`torch.Generator` is used
         so the mini-batch order is reproducible across runs with the same seed.
+
+        ``rxn_scaled`` is an optional ``(N, n_rxn)`` float array of
+        FeaturePreprocessor-scaled reaction-condition features.  When provided,
+        each graph Data object receives a ``reaction_features`` attribute of
+        shape ``(1, n_rxn)`` — the leading dimension of 1 ensures PyG's
+        collate function stacks them correctly into ``(batch_size, n_rxn)``.
         """
         dataset = self.representation.transform(df)
         for i, data in enumerate(dataset._data):
             data.y = torch.tensor([y_scaled[i]], dtype=torch.float)
+            if rxn_scaled is not None:
+                data.reaction_features = torch.tensor(
+                    rxn_scaled[i], dtype=torch.float
+                ).unsqueeze(
+                    0
+                )  # (1, n_rxn) → batches to (batch_size, n_rxn)
         batch_size = self.model_params.get("batch_size", 32)
         num_workers = self.model_params.get("num_workers", 0)
         generator = None
@@ -216,7 +261,7 @@ class GNNExperiment:
             pin_memory=(num_workers > 0 and self.device.type == "cuda"),
         )
 
-    def _build_model(self) -> BaseReactionGNN:
+    def _build_model(self, reaction_feature_dim: int = 0) -> BaseReactionGNN:
         # Training-loop params are not forwarded to the model constructor
         _TRAINING_KEYS = {"epochs", "lr", "batch_size", "num_workers"}
         arch_params = {
@@ -224,9 +269,11 @@ class GNNExperiment:
             for k, v in self.model_params.items()
             if k not in _TRAINING_KEYS
         }
-        return build_reaction_gnn(node_in_dim=NODE_FEAT_DIM, **arch_params).to(
-            self.device
-        )
+        return build_reaction_gnn(
+            node_in_dim=NODE_FEAT_DIM,
+            reaction_feature_dim=reaction_feature_dim,
+            **arch_params,
+        ).to(self.device)
 
     def _train(self, model: BaseReactionGNN, loader: DataLoader) -> None:
         optimizer = torch.optim.Adam(
@@ -348,7 +395,7 @@ class GNNExperiment:
 
     def _run_signature(self) -> dict:
         split_cfg = getattr(self.split_strategy, "config", {})
-        return {
+        sig = {
             "representation": {"type": "graph"},
             "model": {"type": self.arch_label},
             "split": {
@@ -358,3 +405,6 @@ class GNNExperiment:
             },
             "seed": self.seed,
         }
+        if self.reaction_features:
+            sig["reaction_features"] = sorted(self.reaction_features)
+        return sig
