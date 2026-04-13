@@ -31,6 +31,7 @@ class Experiment:
         external_test_set: pd.DataFrame | None = None,
         explainability_cfg: dict | None = None,
         reaction_features: list[str] | None = None,
+        rep_label: str | None = None,
     ):
         self.dataset = dataset
         self.smiles_columns = smiles_columns
@@ -48,6 +49,11 @@ class Experiment:
         self.external_test_set = external_test_set
         self.explainability_cfg: dict = explainability_cfg or {}
         self.reaction_features: list[str] = reaction_features or []
+        # User-supplied (or BenchmarkRunner-resolved) label for this
+        # representation.  When set, it takes precedence over the
+        # auto-derived rep_type in _run_signature() so that run directory
+        # paths match the label shown in the results JSON.
+        self.rep_label: str | None = rep_label
 
     def run(self):
         model_type = self.model_cfg.get("type", None)
@@ -208,17 +214,24 @@ class Experiment:
         return X_train, X_test
 
     def _run_signature(self, model_type: str) -> dict:
-        rep_type = getattr(
-            self.representation, "rep_type", type(self.representation).__name__
-        )
-
-        rep_params = getattr(self.representation, "rep_params", {})
-        if rep_type in ("df_lookup", "bespoke", "precomputed"):
-            feature_name = rep_params.get("feature_name", None)
-            rep_type = rep_type + "_" + feature_name
-        if rep_type == "hf_transformer":
-            model_name = rep_params.get("model_type", None)
-            rep_type = rep_type + "_" + model_name
+        # Use the resolved label supplied by BenchmarkRunner when available.
+        # Fall back to the existing rep_type introspection for callers that
+        # construct Experiment directly (e.g. unit tests, external scripts).
+        if self.rep_label is not None:
+            rep_type = self.rep_label
+        else:
+            rep_type = getattr(
+                self.representation,
+                "rep_type",
+                type(self.representation).__name__,
+            )
+            rep_params = getattr(self.representation, "rep_params", {})
+            if rep_type in ("df_lookup", "bespoke", "precomputed"):
+                feature_name = rep_params.get("feature_name", None)
+                rep_type = rep_type + "_" + feature_name
+            if rep_type == "hf_transformer":
+                model_name = rep_params.get("model_type", None)
+                rep_type = rep_type + "_" + model_name
 
         split_cfg = getattr(self.split_strategy, "config", {})
         sampler = split_cfg.get("sampler", split_cfg.get("type", "unknown"))
