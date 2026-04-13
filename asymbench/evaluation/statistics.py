@@ -1,5 +1,5 @@
-import warnings
 from itertools import combinations
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -8,8 +8,16 @@ from statsmodels.stats.multitest import multipletests
 
 _VALID_ALTERNATIVES = ("two-sided", "greater", "less")
 _VALID_CORRECTIONS = (
-    "bonferroni", "sidak", "holm-sidak", "holm", "simes-hochberg",
-    "hommel", "fdr_bh", "fdr_by", "fdr_tsbh", "fdr_tsbky",
+    "bonferroni",
+    "sidak",
+    "holm-sidak",
+    "holm",
+    "simes-hochberg",
+    "hommel",
+    "fdr_bh",
+    "fdr_by",
+    "fdr_tsbh",
+    "fdr_tsbky",
 )
 
 
@@ -168,7 +176,9 @@ def friedman_wilcoxon_by_group(
             )
             stat, p = np.nan, 1.0
         else:
-            stat, p = wilcoxon(xa, xb, alternative=alternative, zero_method="wilcox")
+            stat, p = wilcoxon(
+                xa, xb, alternative=alternative, zero_method="wilcox"
+            )
 
         raw_pvals.append(p)
         rows.append(
@@ -182,7 +192,9 @@ def friedman_wilcoxon_by_group(
             }
         )
 
-    reject, p_corr, _, _ = multipletests(raw_pvals, alpha=alpha, method=correction)
+    reject, p_corr, _, _ = multipletests(
+        raw_pvals, alpha=alpha, method=correction
+    )
 
     pairwise = pd.DataFrame(rows)
     pairwise["p_value_corrected"] = p_corr

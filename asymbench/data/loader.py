@@ -99,7 +99,9 @@ def load_dataset(config: dict) -> pd.DataFrame:
     # ------------------------------------------------------------------ #
     reaction_features: list[str] = config.get("reaction_features") or []
     if reaction_features:
-        _check_columns_exist(data, reaction_features, context="reaction_features")
+        _check_columns_exist(
+            data, reaction_features, context="reaction_features"
+        )
 
         # Warn about any reaction feature that overlaps with SMILES or target
         overlap = set(reaction_features) & (set(smiles_cols) | {target})
@@ -140,6 +142,7 @@ def load_dataset(config: dict) -> pd.DataFrame:
 # --------------------------------------------------------------------------- #
 # Helpers                                                                      #
 # --------------------------------------------------------------------------- #
+
 
 def _check_columns_exist(
     df: pd.DataFrame, columns: list[str], context: str

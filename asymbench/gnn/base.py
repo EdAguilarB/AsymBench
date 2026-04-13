@@ -176,7 +176,9 @@ class BaseReactionGNN(nn.Module):
         self.pooling_fn, pool_mult = _make_pooling_fn(pooling)
         self.graph_embedding_dim = hidden_dim * pool_mult
         # Actual input to the readout MLP: graph embedding + scaled rxn features
-        self.readout_input_dim = self.graph_embedding_dim + reaction_feature_dim
+        self.readout_input_dim = (
+            self.graph_embedding_dim + reaction_feature_dim
+        )
 
         # Subclasses define these before calling make_readout_layers()
         self.conv_layers: nn.ModuleList

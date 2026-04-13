@@ -101,7 +101,9 @@ class BenchmarkRunner:
         )
         hash_suffix = hashlib.md5(cache_key_str.encode()).hexdigest()[:8]
         label = _result_rep_label(rep_cfg)
-        cache_dir = Path(self.config["log_dirs"]["benchmark"]) / "representations"
+        cache_dir = (
+            Path(self.config["log_dirs"]["benchmark"]) / "representations"
+        )
         return cache_dir / f"{label}_{hash_suffix}.csv"
 
     def _precompute_fit_free_representations(self) -> None:
@@ -136,7 +138,8 @@ class BenchmarkRunner:
             disk_path = self._rep_cache_path(rep_cfg)
             if disk_path.exists():
                 logger.info(
-                    "Loading cached representation from disk: %s", disk_path.name
+                    "Loading cached representation from disk: %s",
+                    disk_path.name,
                 )
                 self._precomputed[key] = pd.read_csv(disk_path, index_col=0)
                 continue
@@ -151,7 +154,9 @@ class BenchmarkRunner:
             if hasattr(rep, "fit"):
                 continue  # trainable representation — handled per-experiment
 
-            logger.info("Pre-computing representation: %s ...", rep_cfg["type"])
+            logger.info(
+                "Pre-computing representation: %s ...", rep_cfg["type"]
+            )
             X = rep.transform(full_data)
             # Embed reaction-condition columns so index-lookups return them
             # for free — no per-experiment concatenation needed.
