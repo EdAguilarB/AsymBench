@@ -572,6 +572,7 @@ explainability:
   # GNN (Integrated Gradients)
   n_steps: 50                 # Riemann-sum steps; use ≥ 100 for publication
   fragmentation: brics        # brics | murcko_scaffold
+  top_k: 5                   # fragments shown in beeswarm plot
 
 
 # ─────────────────────────────────────────────────────────────
@@ -789,10 +790,10 @@ Attribution is then aggregated to **molecular fragment level** using BRICS decom
 | File | Contents |
 |---|---|
 | `node_masks.npz` | Per-graph signed IG scores for every node feature |
-| `fragment_importances.csv` | Long-format CSV: `fragment`, `source`, `importance` — one row per score |
-| `fragment_beeswarm.png` | SHAP-style beeswarm: top-k positive and top-k negative fragments |
+| `fragment_importances.csv` | Long-format CSV: `reaction_idx`, `fragment`, `source`, `importance` (mean IG), `count` (occurrences in molecule) — one row per (reaction, fragment) pair |
+| `fragment_beeswarm.png` | SHAP beeswarm produced by `shap.summary_plot()` — top-k fragments by mean \|IG\|, colour-coded by occurrence count; visually identical to TML beeswarms |
 
-The `fragment_importances.csv` long format (one row per individual IG score, no aggregation) is ready to use directly with seaborn `stripplot` / `swarmplot` or `shap.plots.beeswarm`.
+`reaction_idx` matches the original dataset row index, so you can join `fragment_importances.csv` back to your reaction CSV to look up full reaction context. `count` records how many times a fragment appears in the molecule, which helps distinguish high-importance scaffolds from rare motifs.
 
 ---
 
