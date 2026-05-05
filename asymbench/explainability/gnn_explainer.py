@@ -502,11 +502,7 @@ class GNNExplainer:
         return node_masks
 
     def save(
-        self,
-        node_masks: Dict,
-        data_list: list,
-        outdir: Path,
-        top_k: int = 20,
+        self, node_masks: Dict, data_list: list, outdir: Path, top_k: int = 20
     ) -> None:
         """Persist node masks and fragment importances to *outdir*.
 
@@ -534,7 +530,9 @@ class GNNExplainer:
             **{str(k): v for k, v in node_masks.items()},
         )
 
-        mol_frags = _compute_mol_frags(data_list, node_masks, self.fragmentation)
+        mol_frags = _compute_mol_frags(
+            data_list, node_masks, self.fragmentation
+        )
 
         if mol_frags:
             _mol_frags_to_df(mol_frags).to_csv(
