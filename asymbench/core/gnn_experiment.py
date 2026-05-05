@@ -298,10 +298,7 @@ class GNNExperiment:
         run_dir: Path,
     ) -> None:
         """Run CaptumExplainer and save node masks + fragment importances."""
-        from asymbench.explainability.gnn_explainer import (
-            GNNExplainer,
-            get_fragment_importance,
-        )
+        from asymbench.explainability.gnn_explainer import GNNExplainer
 
         expl_cfg = self.explainability_cfg
         explainer = GNNExplainer(
@@ -314,10 +311,12 @@ class GNNExperiment:
             outdir = run_dir / "explainability" / prefix
             dataset = loader.dataset
             node_masks = explainer.explain_dataset(dataset, self.device)
-            frag_importances = get_fragment_importance(
-                dataset._data, node_masks, explainer.fragmentation
+            explainer.save(
+                node_masks,
+                dataset._data,
+                outdir,
+                top_k=expl_cfg.get("top_k", 5),
             )
-            explainer.save(node_masks, frag_importances, outdir)
 
     # ------------------------------------------------------------------
     # Reporting helpers
