@@ -201,6 +201,170 @@ def get_fragment_importance(
 
 
 # ---------------------------------------------------------------------------
+# SHAP-compatible explanation builder
+# ---------------------------------------------------------------------------
+
+
+def _compute_mol_frags(
+    data_list: list,
+    node_masks: Dict,
+    fragmentation_method: FragmentationMethod,
+) -> Dict:
+    """Collect per-molecule fragment IG data.
+
+    Returns
+    -------
+    dict
+        ``{mol_idx: {(frag_smi, col): {"scores": [s, ...], "count": n}}}``
+        where *scores* are per-occurrence summed-atom IG values and *count*
+        is the number of occurrences of the fragment in that molecule.
+    """
+    mol_frags: Dict = {}
+
+    for data in data_list:
+        mol_idx = data.idx
+        if mol_idx not in node_masks:
+            continue
+
+        node_mask = node_masks[mol_idx]
+        num_atoms = 0
+        mol_frags[mol_idx] = {}
+
+        for col, smiles in data.mol_smiles:
+            mol_obj = Chem.MolFromSmiles(smiles)
+            mol_num_atoms = mol_obj.GetNumAtoms() if mol_obj is not None else 0
+
+            try:
+                frags = fragment_and_match(smiles, fragmentation_method)
+            except ValueError:
+                num_atoms += mol_num_atoms
+                continue
+
+            for frag_smiles, atom_indices_list in frags.items():
+                if len(frag_smiles) < 3:
+                    continue
+                key = (frag_smiles, col)
+                scores = []
+                for atom_indices in atom_indices_list:
+                    global_indices = [num_atoms + i for i in atom_indices]
+                    scores.append(float(np.sum(node_mask[global_indices])))
+                mol_frags[mol_idx][key] = {
+                    "scores": scores,
+                    "count": len(atom_indices_list),
+                }
+
+            num_atoms += mol_num_atoms
+
+    return mol_frags
+
+
+def _mol_frags_to_df(mol_frags: Dict) -> pd.DataFrame:
+    """Flatten *mol_frags* to a long-format DataFrame.
+
+    Columns: ``reaction_idx``, ``fragment``, ``source``, ``importance``
+    (mean IG across occurrences), ``count`` (occurrences in molecule).
+    One row per (reaction, fragment) pair.
+    """
+    rows = []
+    for mol_idx, mol_dict in mol_frags.items():
+        for (frag_smi, col), info in mol_dict.items():
+            rows.append(
+                {
+                    "reaction_idx": mol_idx,
+                    "fragment": frag_smi,
+                    "source": col,
+                    "importance": float(np.mean(info["scores"])),
+                    "count": info["count"],
+                }
+            )
+    return (
+        pd.DataFrame(rows)
+        .sort_values(["reaction_idx", "fragment", "source"])
+        .reset_index(drop=True)
+    )
+
+
+def build_shap_explanation(
+    data_list: list,
+    node_masks: Dict,
+    fragmentation_method: FragmentationMethod,
+    top_k: int = 20,
+) -> "shap.Explanation":
+    """Build a ``shap.Explanation`` from per-molecule IG fragment attributions.
+
+    Constructs a ``[n_samples × n_features]`` matrix where features are
+    ``(fragment_smiles, source_col)`` pairs.  For each molecule:
+
+    * **Fragment present** → SHAP value = mean per-occurrence IG score;
+      feature value = occurrence count.
+    * **Fragment absent** → SHAP value = 0; feature value = 0.
+
+    The column space is reduced to the *top_k* fragments ranked by
+    mean absolute SHAP value across the dataset before the object is built.
+
+    Parameters
+    ----------
+    data_list:
+        ``dataset._data`` — each item must expose ``data.idx`` and
+        ``data.mol_smiles`` (list of ``(col, smiles)`` pairs).
+    node_masks:
+        ``{data.idx: np.ndarray shape [num_nodes, num_features]}``
+    fragmentation_method:
+        How to fragment each molecule.
+    top_k:
+        Maximum number of fragments (columns) to retain.
+
+    Returns
+    -------
+    shap.Explanation
+        ``.values`` — mean IG per molecule per fragment (shape ``[n, k]``).
+        ``.data``   — fragment occurrence count per molecule (shape ``[n, k]``).
+        ``.feature_names`` — ``"frag_smi (source_col)"`` strings.
+    """
+    import shap as _shap
+
+    mol_frags = _compute_mol_frags(data_list, node_masks, fragmentation_method)
+
+    if not mol_frags:
+        return _shap.Explanation(
+            values=np.zeros((0, 0)),
+            base_values=np.zeros(0),
+            data=np.zeros((0, 0)),
+            feature_names=[],
+        )
+
+    all_keys: List[Tuple[str, str]] = sorted(
+        {key for mol_dict in mol_frags.values() for key in mol_dict}
+    )
+    mol_indices = sorted(mol_frags.keys())
+    n_samples = len(mol_indices)
+    n_features = len(all_keys)
+    key_to_col = {k: i for i, k in enumerate(all_keys)}
+
+    shap_vals = np.zeros((n_samples, n_features), dtype=float)
+    feat_vals = np.zeros((n_samples, n_features), dtype=float)
+
+    for row_i, mol_idx in enumerate(mol_indices):
+        for key, info in mol_frags[mol_idx].items():
+            col_j = key_to_col[key]
+            shap_vals[row_i, col_j] = float(np.mean(info["scores"]))
+            feat_vals[row_i, col_j] = float(info["count"])
+
+    mean_abs = np.mean(np.abs(shap_vals), axis=0)
+    k = min(top_k, n_features)
+    top_idx = np.sort(np.argsort(mean_abs)[::-1][:k])
+
+    feature_names = [f"{all_keys[i][0]} ({all_keys[i][1]})" for i in top_idx]
+
+    return _shap.Explanation(
+        values=shap_vals[:, top_idx],
+        base_values=np.zeros(n_samples),
+        data=feat_vals[:, top_idx],
+        feature_names=feature_names,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Integrated Gradients core
 # ---------------------------------------------------------------------------
 
@@ -340,9 +504,9 @@ class GNNExplainer:
     def save(
         self,
         node_masks: Dict,
-        frag_importances: Dict[Tuple[str, str], List[float]],
+        data_list: list,
         outdir: Path,
-        top_k: int = 5,
+        top_k: int = 20,
     ) -> None:
         """Persist node masks and fragment importances to *outdir*.
 
@@ -351,17 +515,16 @@ class GNNExplainer:
         ``node_masks.npz``
             Compressed numpy archive keyed by reaction index.
         ``fragment_importances.csv``
-            Long-format CSV with one row per individual IG score.
-            Columns: fragment, source, importance.
-            Sorted by fragment then source for easy beeswarm plot construction.
+            Long-format CSV with one row per (molecule, fragment) pair.
+            Columns: fragment, source, importance (mean IG), count
+            (occurrences of fragment in molecule).
         ``fragment_beeswarm.png``
-            SHAP-style horizontal beeswarm plot of the top-*k*
-            ``(fragment, source)`` pairs ranked by mean absolute IG importance.
-            Red dots push the prediction up; blue dots push it down.
+            SHAP beeswarm plot of the top-*k* fragments produced by
+            ``shap.summary_plot`` so the visual style is identical to TML
+            explanations.
         """
-        from asymbench.visualization.gnn_beeswarm import (
-            plot_gnn_fragment_beeswarm,
-        )
+        import matplotlib.pyplot as plt
+        import shap as _shap
 
         outdir = Path(outdir)
         outdir.mkdir(parents=True, exist_ok=True)
@@ -371,23 +534,21 @@ class GNNExplainer:
             **{str(k): v for k, v in node_masks.items()},
         )
 
-        if frag_importances:
-            rows = [
-                {
-                    "fragment": frag_smi,
-                    "source": source_col,
-                    "importance": score,
-                }
-                for (frag_smi, source_col), scores in frag_importances.items()
-                for score in scores
-            ]
-            df_frags = (
-                pd.DataFrame(rows)
-                .sort_values(["fragment", "source"])
-                .reset_index(drop=True)
-            )
-            df_frags.to_csv(outdir / "fragment_importances.csv", index=False)
+        mol_frags = _compute_mol_frags(data_list, node_masks, self.fragmentation)
 
-            plot_gnn_fragment_beeswarm(
-                df_frags, outpath=outdir / "fragment_beeswarm.png", top_k=top_k
+        if mol_frags:
+            _mol_frags_to_df(mol_frags).to_csv(
+                outdir / "fragment_importances.csv", index=False
             )
+
+        shap_exp = build_shap_explanation(
+            data_list, node_masks, self.fragmentation, top_k=top_k
+        )
+        if shap_exp.values.size > 0:
+            fig = plt.figure()
+            _shap.summary_plot(shap_exp, show=False, max_display=top_k)
+            plt.tight_layout()
+            plt.savefig(
+                outdir / "fragment_beeswarm.png", dpi=350, bbox_inches="tight"
+            )
+            plt.close(fig)
