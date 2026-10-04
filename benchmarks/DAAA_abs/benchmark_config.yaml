@@ -1,5 +1,5 @@
 dataset:
-  path: data/DAAA_abs/DAAA.csv
+  path: data/DAAA/DAAA.csv
   smiles_columns: [substrate_smiles, ligand_smiles, solvent_smiles]
   target: ddG_abs
   id_col: Example
