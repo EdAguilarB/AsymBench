@@ -975,7 +975,25 @@ Then use `architecture: my_arch` in the YAML `params` block.
 
 ## Citation
 
-Coming soon :)
+If you use AsymBench in your research, please cite:
+
+> Aguilar-Bejarano, E.; Galvin, D.; Rogers, D. M.; Özcan, E.; Woodward, S.; Guiry, P. J.; Figueredo, G.
+> **Benchmarking molecular representations and machine learning algorithms for asymmetric catalysis: a palladium-catalysed decarboxylative asymmetric allylic alkylation case study.**
+> *Journal of Cheminformatics* **18**, 120 (2026).
+> https://doi.org/10.1186/s13321-026-01236-z
+
+```bibtex
+@article{aguilarbejarano2026asymbench,
+  author  = {Aguilar-Bejarano, E.; Galvin, D.; Rogers, D. M.; Özcan, E.; Woodward, S.; Guiry, P. J.; Figueredo, G.},
+  title   = {Benchmarking molecular representations and machine learning algorithms for asymmetric catalysis: a palladium-catalysed decarboxylative asymmetric allylic alkylation case study},
+  journal = {Journal of Cheminformatics},
+  volume  = {18},
+  pages   = {120},
+  year    = {2026},
+  doi     = {10.1186/s13321-026-01236-z},
+  url     = {https://doi.org/10.1186/s13321-026-01236-z}
+}
+```
 
 ## License
 
